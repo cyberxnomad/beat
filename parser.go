@@ -22,8 +22,9 @@ const (
 var DefaultLayout = []LayoutField{Year, Month, Dom, Dow, Hour, Minute, Second}
 
 type Parser struct {
-	layout      []LayoutField
-	validFields LayoutField
+	layout         []LayoutField
+	validFields    LayoutField
+	defaultLoction *time.Location // 缺省时区，解析时未指定时区则以该参数时区解析
 }
 
 type SchedTime struct {
@@ -36,16 +37,22 @@ type SchedTime struct {
 	Second uint64    // 秒
 
 	validFields LayoutField
+	location    *time.Location
 }
 
-var defaultParser = NewParser(DefaultLayout)
+var defaultParser = NewParser()
 
-func NewParser(layout []LayoutField) *Parser {
+func NewParser(opts ...ParserOption) *Parser {
 	p := new(Parser)
-	p.layout = layout
+	p.layout = DefaultLayout
+	p.defaultLoction = time.Local
 
-	for i := range layout {
-		p.validFields |= layout[i]
+	for _, opt := range opts {
+		opt(p)
+	}
+
+	for i := range p.layout {
+		p.validFields |= p.layout[i]
 	}
 
 	return p
@@ -96,6 +103,7 @@ func (p *Parser) Parse(exp string) (Schedule, error) {
 
 	st := new(SchedTime)
 	st.validFields = p.validFields
+	st.location = p.defaultLoction
 
 	for i := range p.layout {
 		bits, err := parseField(fields[i], p.layout[i])
@@ -226,6 +234,18 @@ func (st *SchedTime) Next(t time.Time) time.Time {
 	// 检查时间域是否匹配，如果匹配，则进行下一个域的匹配。
 	// 如果域不匹配，则增加该域的值。
 
+	// 如果指定了时区，则将给定时间转换为 SchedTime 的时区。
+	// 保存原始时区，以便找到时间后再转换回来。
+	// 请注意，未指定时区的 SchedTime 将被视为本地时区。
+	origLocation := t.Location()
+	loc := st.location
+	if loc == time.Local {
+		loc = t.Location()
+	}
+	if st.location != time.Local {
+		t = t.In(st.location)
+	}
+
 	// 匹配机制未匹配到时，将一直增加时间进行匹配，
 	// 此值用于限制匹配失败的上限
 	yearMax := t.Year() + 2
@@ -252,7 +272,7 @@ LOOP:
 	for (1<<delta)&yearBits == 0 {
 		if !added {
 			added = true
-			t = time.Date(t.Year(), time.January, 1, 0, 0, 0, 0, time.Local)
+			t = time.Date(t.Year(), time.January, 1, 0, 0, 0, 0, loc)
 		}
 		t = t.AddDate(1, 0, 0)
 
@@ -264,7 +284,7 @@ LOOP:
 	for (1<<t.Month())&st.Month == 0 {
 		if !added {
 			added = true
-			t = time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.Local)
+			t = time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, loc)
 		}
 		t = t.AddDate(0, 1, 0)
 
@@ -277,7 +297,7 @@ LOOP:
 	for !isDayMatch(st, t) {
 		if !added {
 			added = true
-			t = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.Local)
+			t = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
 		}
 		t = t.AddDate(0, 0, 1)
 
@@ -289,7 +309,7 @@ LOOP:
 	for (1<<t.Hour())&st.Hour == 0 {
 		if !added {
 			added = true
-			t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, time.Local)
+			t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), 0, 0, 0, loc)
 		}
 		t = t.Add(time.Hour)
 
@@ -322,7 +342,7 @@ LOOP:
 		}
 	}
 
-	return t
+	return t.In(origLocation)
 }
 
 // 判断“日”是否匹配，匹配规则为：必须“日”和“星期”都匹配，则认为匹配

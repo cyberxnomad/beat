@@ -281,21 +281,105 @@ func TestStartNoop(t *testing.T) {
 	}
 }
 
-func TestTimeZone(t *testing.T) {
+func TestLocalTimezone(t *testing.T) {
 	wg := &sync.WaitGroup{}
-	wg.Add(1)
+	wg.Add(2)
 
 	cron := New()
 
-	tm := time.Now().Add(2 * time.Second)
-	expr := fmt.Sprintf("%d %d %d %d %d %d %d", tm.Year(), tm.Month(), tm.Day(), tm.Weekday(), tm.Hour(), tm.Minute(), tm.Second())
-	cron.Add(expr, "1", "TestTimeZone-1",
+	tm := time.Now()
+	if tm.Second() >= 58 {
+		time.Sleep(2 * time.Second)
+		tm = time.Now()
+	}
+
+	expr := fmt.Sprintf("%d %d %d %d %d %d %d,%d", tm.Year(), tm.Month(), tm.Day(), tm.Weekday(), tm.Hour(), tm.Minute(), tm.Second()+1, tm.Second()+2)
+	cron.Add(expr, "1", "TestLocalTimezone-1",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
+	cron.Start()
+	defer cron.Stop()
+
 	// Give cron 2 seconds to run our job (which is always activated).
 	select {
-	case <-time.After(OneSecond):
+	case <-time.After(OneSecond * 2):
+		t.Fatal("expected job runs", expr)
+	case <-wait(wg):
+	}
+}
+
+func TestNonLocalTimezone(t *testing.T) {
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
+
+	loc, err := time.LoadLocation("Pacific/Majuro")
+	if err != nil {
+		panic(err)
+	}
+
+	cron := New(
+		WithLocation(loc),
+	)
+
+	tm := time.Now().In(loc)
+	if tm.Second() >= 58 {
+		time.Sleep(2 * time.Second)
+		tm = time.Now().In(loc)
+	}
+
+	expr := fmt.Sprintf("%d %d %d %d %d %d %d,%d", tm.Year(), tm.Month(), tm.Day(), tm.Weekday(), tm.Hour(), tm.Minute(), tm.Second()+1, tm.Second()+2)
+	fmt.Println(expr)
+	cron.Add(expr, "1", "TestNonLocalTimezone-1",
+		func(ctx context.Context, userdata any) { wg.Done() },
+		nil)
+
+	cron.Start()
+	defer cron.Stop()
+
+	// Give cron 2 seconds to run our job (which is always activated).
+	select {
+	case <-time.After(OneSecond * 2):
+		t.Fatal("expected job runs", expr)
+	case <-wait(wg):
+	}
+}
+
+func TestParserWithNonLocalTimezone(t *testing.T) {
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
+
+	loc, err := time.LoadLocation("Pacific/Majuro")
+	if err != nil {
+		panic(err)
+	}
+
+	cron := New(
+		WithParser(
+			NewParser(
+				WithDefaultLocation(loc),
+			),
+		),
+	)
+
+	tm := time.Now().In(loc)
+	if tm.Second() >= 58 {
+		time.Sleep(2 * time.Second)
+		tm = time.Now().In(loc)
+	}
+
+	expr := fmt.Sprintf("%d %d %d %d %d %d %d,%d", tm.Year(), tm.Month(), tm.Day(), tm.Weekday(), tm.Hour(), tm.Minute(), tm.Second()+1, tm.Second()+2)
+	fmt.Println(expr)
+	cron.Add(expr, "1", "TestParserWithNonLocalTimezone-1",
+		func(ctx context.Context, userdata any) { wg.Done() },
+		nil)
+
+	cron.Start()
+	defer cron.Stop()
+
+	// Give cron 2 seconds to run our job (which is always activated).
+	select {
+	case <-time.After(OneSecond * 2):
 		t.Fatal("expected job runs", expr)
 	case <-wait(wg):
 	}

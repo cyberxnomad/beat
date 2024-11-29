@@ -33,6 +33,7 @@ type Cron struct {
 	lock        sync.Mutex      // 互斥锁
 	running     bool            // 是否运行
 	parser      ScheduleParser  // 解析器
+	location    *time.Location  // 时区
 	ctx         context.Context // 上下文
 	log         *log.Helper     // log
 
@@ -79,10 +80,11 @@ func emptyJobFunc(_ context.Context, _ any) {}
 
 func New(opts ...Option) *Cron {
 	c := &Cron{
-		jobs:   []*job{},
-		parser: defaultParser,
-		ctx:    context.Background(),
-		log:    log.NewHelper(log.With(log.NewStdLogger(os.Stdout), "ts", log.DefaultTimestamp, "caller", log.DefaultCaller)),
+		jobs:     []*job{},
+		parser:   defaultParser,
+		location: time.Local,
+		ctx:      context.Background(),
+		log:      log.NewHelper(log.With(log.NewStdLogger(os.Stdout), "ts", log.DefaultTimestamp, "caller", log.DefaultCaller)),
 
 		add:                make(chan *job),
 		remove:             make(chan string),
@@ -100,12 +102,15 @@ func New(opts ...Option) *Cron {
 }
 
 func (c *Cron) run() {
-	now := time.Now()
+	c.log.Info("started")
+	defer c.log.Info("stopped")
+
+	now := c.now()
 
 	// 获取一次所有任务的下一次有效时间
 	for _, job := range c.jobs {
 		job.Next = job.Schedule.Next(now)
-		c.log.Infow("job.action", "schedule", "job.id", job.Id, "job.name", job.Name, "job.next", job.Next)
+		c.log.Infow("job.action", "schedule", "job.id", job.Id, "job.name", job.Name, "job.next", job.Next.Format(time.RFC3339), "now", now.Format(time.RFC3339))
 	}
 
 	for {
@@ -124,7 +129,8 @@ func (c *Cron) run() {
 		for {
 			select {
 			case now = <-timer.C:
-				c.log.Debugw("job.action", "wake")
+				now = now.In(c.location)
+				c.log.Debugw("job.action", "wake", "now", now.Format(time.RFC3339))
 
 				// 执行所有已经到定时的任务
 				for _, job := range c.jobs {
@@ -144,32 +150,32 @@ func (c *Cron) run() {
 
 			case newJob := <-c.add:
 				timer.Stop()
-				now = time.Now()
+				now = c.now()
 				newJob.Next = newJob.Schedule.Next(now)
 				c.jobs = append(c.jobs, newJob)
-				c.log.Infow("job.action", "added", "job.id", newJob.Id, "job.name", newJob.Name, "job.next", newJob.Next)
+				c.log.Infow("job.action", "added", "job.id", newJob.Id, "job.name", newJob.Name, "job.next", newJob.Next.Format(time.RFC3339))
 
 			case id := <-c.remove:
 				timer.Stop()
-				now = time.Now()
+				now = c.now()
 				c.removeJob(id)
 				c.log.Infow("job.action", "removed", "job.id", id)
 
 			case <-c.removeAll:
 				timer.Stop()
-				now = time.Now()
+				now = c.now()
 				c.removeAllJob()
 				c.log.Infow("job.action", "removed all")
 
 			case name := <-c.removeByName:
 				timer.Stop()
-				now = time.Now()
+				now = c.now()
 				c.removeJobByName(name)
 				c.log.Infow("job.action", "removed by name", "job.name", name)
 
 			case prefix := <-c.removeByNamePrefix:
 				timer.Stop()
-				now = time.Now()
+				now = c.now()
 				c.removeJobByNamePrefix(prefix)
 				c.log.Infow("job.action", "removed by name prefix", "job.name_prefix", prefix)
 
@@ -182,6 +188,11 @@ func (c *Cron) run() {
 			break
 		}
 	}
+}
+
+// 返回 c.location 的当前时间
+func (c *Cron) now() time.Time {
+	return time.Now().In(c.location)
 }
 
 // 开始执行任务，任务将在协程中执行

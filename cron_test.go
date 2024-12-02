@@ -52,7 +52,9 @@ func TestStopCausesJobsToNotRun(t *testing.T) {
 	cron := New()
 	cron.Start()
 	cron.Stop()
-	cron.Add("* * * * * * *", "1", "TestStopCausesJobsToNotRun-1", func(ctx context.Context, userdata any) { wg.Done() }, nil)
+	cron.Add("* * * * * * *", "TestStopCausesJobsToNotRun-1",
+		func(ctx context.Context, userdata any) { wg.Done() },
+		nil)
 
 	select {
 	case <-time.After(OneSecond):
@@ -68,8 +70,7 @@ func TestAddBeforeRunning(t *testing.T) {
 	wg.Add(1)
 
 	cron := New()
-	cron.Add("* * * * * * *",
-		"1", "TestAddBeforeRunning-1",
+	cron.Add("* * * * * * *", "TestAddBeforeRunning-1",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 	cron.Start()
@@ -91,8 +92,7 @@ func TestAddWhileRunning(t *testing.T) {
 	cron := New()
 	cron.Start()
 	defer cron.Stop()
-	cron.Add("* * * * * * *",
-		"1", "TestAddWhileRunning-1",
+	cron.Add("* * * * * * *", "TestAddWhileRunning-1",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
@@ -113,8 +113,7 @@ func TestAddWhileRunningWithDelay(t *testing.T) {
 
 	var calls int64
 
-	cron.Add("* * * * * * *",
-		"1", "TestAddWhileRunningWithDelay-1",
+	cron.Add("* * * * * * *", "TestAddWhileRunningWithDelay-1",
 		func(ctx context.Context, userdata any) { atomic.AddInt64(&calls, 1) },
 		nil)
 
@@ -128,12 +127,11 @@ func TestAddWhileRunningWithDelay(t *testing.T) {
 func TestRemoveBeforeRunning(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
-	id := "1"
+	id := "TestRemoveBeforeRunning-1"
 
 	cron := New()
 
-	cron.Add("* * * * * * *",
-		id, "TestRemoveBeforeRunning-1",
+	cron.Add("* * * * * * *", id,
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 	cron.Remove(id)
@@ -152,13 +150,12 @@ func TestRemoveBeforeRunning(t *testing.T) {
 func TestRemoveWhileRunning(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
-	id := "1"
+	id := "TestRemoveWhileRunning-1"
 
 	cron := New()
 	cron.Start()
 	defer cron.Stop()
-	cron.Add("* * * * * * *",
-		id, "TestRemoveWhileRunning-1",
+	cron.Add("* * * * * * *", id,
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 	cron.Remove(id)
@@ -179,39 +176,34 @@ func TestMultipleJobs(t *testing.T) {
 	wg.Add(2)
 
 	cron := New()
-	cron.Add("* 1 1 * 0 0 0",
-		"1", "TestMultipleJobs-1",
+	cron.Add("* 1 1 * 0 0 0", "TestMultipleJobs-1",
 		func(ctx context.Context, userdata any) {},
 		nil)
 
-	cron.Add("* * * * * * *",
-		"2", "TestMultipleJobs-2",
+	cron.Add("* * * * * * *", "TestMultipleJobs-2",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
-	cron.Add("* * * * * * *",
-		"3", "TestMultipleJobs-3",
+	cron.Add("* * * * * * *", "TestMultipleJobs-3",
 		func(ctx context.Context, userdata any) { t.Fatal() },
 		nil)
 
-	cron.Add("* * * * * * *",
-		"4", "TestMultipleJobs-4",
+	cron.Add("* * * * * * *", "TestMultipleJobs-4",
 		func(ctx context.Context, userdata any) { t.Fatal() },
 		nil)
 
 	cron.Add("* 12 31 * 0 0 0",
-		"5", "TestMultipleJobs-5",
+		"TestMultipleJobs-5",
 		func(ctx context.Context, userdata any) {},
 		nil)
 
-	cron.Add("* * * * * * *",
-		"6", "TestMultipleJobs-6",
+	cron.Add("* * * * * * *", "TestMultipleJobs-6",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
-	cron.Remove("3")
+	cron.Remove("TestMultipleJobs-3")
 	cron.Start()
-	cron.Remove("4")
+	cron.Remove("TestMultipleJobs-4")
 	defer cron.Stop()
 
 	select {
@@ -227,18 +219,15 @@ func TestRunningJobTwice(t *testing.T) {
 	wg.Add(2)
 
 	cron := New()
-	cron.Add("* 1 1 * 0 0 0",
-		"1", "TestRunningJobTwice-1",
+	cron.Add("* 1 1 * 0 0 0", "TestRunningJobTwice-1",
 		func(ctx context.Context, userdata any) {},
 		nil)
 
-	cron.Add("* 12 31 * 0 0 0",
-		"2", "TestRunningJobTwice-2",
+	cron.Add("* 12 31 * 0 0 0", "TestRunningJobTwice-2",
 		func(ctx context.Context, userdata any) {},
 		nil)
 
-	cron.Add("* * * * * * *",
-		"3", "TestRunningJobTwice-3",
+	cron.Add("* * * * * * *", "TestRunningJobTwice-3",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
@@ -258,8 +247,7 @@ func TestStartNoop(t *testing.T) {
 
 	cron := New()
 
-	cron.Add("* * * * * * *",
-		"1", "TestStartNoop-1",
+	cron.Add("* * * * * * *", "TestStartNoop-1",
 		func(ctx context.Context, userdata any) { userdata.(chan struct{}) <- struct{}{} },
 		tickChan)
 
@@ -294,7 +282,7 @@ func TestLocalTimezone(t *testing.T) {
 	}
 
 	expr := fmt.Sprintf("%d %d %d %d %d %d %d,%d", tm.Year(), tm.Month(), tm.Day(), tm.Weekday(), tm.Hour(), tm.Minute(), tm.Second()+1, tm.Second()+2)
-	cron.Add(expr, "1", "TestLocalTimezone-1",
+	cron.Add(expr, "TestLocalTimezone-1",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
@@ -328,9 +316,11 @@ func TestNonLocalTimezone(t *testing.T) {
 		tm = time.Now().In(loc)
 	}
 
-	expr := fmt.Sprintf("%d %d %d %d %d %d %d,%d", tm.Year(), tm.Month(), tm.Day(), tm.Weekday(), tm.Hour(), tm.Minute(), tm.Second()+1, tm.Second()+2)
-	fmt.Println(expr)
-	cron.Add(expr, "1", "TestNonLocalTimezone-1",
+	expr := fmt.Sprintf("%d %d %d %d %d %d %d,%d",
+		tm.Year(), tm.Month(), tm.Day(), tm.Weekday(),
+		tm.Hour(), tm.Minute(), tm.Second()+1, tm.Second()+2)
+
+	cron.Add(expr, "TestNonLocalTimezone-1",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
@@ -368,9 +358,11 @@ func TestParserWithNonLocalTimezone(t *testing.T) {
 		tm = time.Now().In(loc)
 	}
 
-	expr := fmt.Sprintf("%d %d %d %d %d %d %d,%d", tm.Year(), tm.Month(), tm.Day(), tm.Weekday(), tm.Hour(), tm.Minute(), tm.Second()+1, tm.Second()+2)
-	fmt.Println(expr)
-	cron.Add(expr, "1", "TestParserWithNonLocalTimezone-1",
+	expr := fmt.Sprintf("%d %d %d %d %d %d %d,%d",
+		tm.Year(), tm.Month(), tm.Day(), tm.Weekday(),
+		tm.Hour(), tm.Minute(), tm.Second()+1, tm.Second()+2)
+
+	cron.Add(expr, "TestParserWithNonLocalTimezone-1",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 

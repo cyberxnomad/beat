@@ -17,7 +17,6 @@ type JobFunc func(ctx context.Context, userdata any)
 
 type job struct {
 	Id       string  // 任务ID
-	Name     string  // 任务名称
 	Func     JobFunc // 定时执行的任务
 	Userdata any     // 用户数据
 
@@ -37,12 +36,12 @@ type Cron struct {
 	ctx         context.Context // 上下文
 	log         *log.Helper     // log
 
-	add                chan *job
-	remove             chan string
-	removeAll          chan struct{}
-	removeByName       chan string
-	removeByNamePrefix chan string
-	stop               chan struct{}
+	add            chan *job
+	remove         chan string
+	removeAll      chan struct{}
+	removeByName   chan string
+	removeByPrefix chan string
+	stop           chan struct{}
 }
 
 type ScheduleParser interface {
@@ -86,12 +85,12 @@ func New(opts ...Option) *Cron {
 		ctx:      context.Background(),
 		log:      log.NewHelper(log.With(log.NewStdLogger(os.Stdout), "ts", log.DefaultTimestamp, "caller", log.DefaultCaller)),
 
-		add:                make(chan *job),
-		remove:             make(chan string),
-		removeAll:          make(chan struct{}),
-		removeByName:       make(chan string),
-		removeByNamePrefix: make(chan string),
-		stop:               make(chan struct{}),
+		add:            make(chan *job),
+		remove:         make(chan string),
+		removeAll:      make(chan struct{}),
+		removeByName:   make(chan string),
+		removeByPrefix: make(chan string),
+		stop:           make(chan struct{}),
 	}
 
 	for _, opt := range opts {
@@ -110,7 +109,7 @@ func (c *Cron) run() {
 	// 获取一次所有任务的下一次有效时间
 	for _, job := range c.jobs {
 		job.Next = job.Schedule.Next(now)
-		c.log.Infow("job.action", "schedule", "job.id", job.Id, "job.name", job.Name, "job.next", job.Next.Format(time.RFC3339), "now", now.Format(time.RFC3339))
+		c.log.Infow("job.action", "schedule", "job.id", job.Id, "job.next", job.Next.Format(time.RFC3339))
 	}
 
 	for {
@@ -130,14 +129,14 @@ func (c *Cron) run() {
 			select {
 			case now = <-timer.C:
 				now = now.In(c.location)
-				c.log.Debugw("job.action", "wake", "now", now.Format(time.RFC3339))
+				c.log.Debugw("job.action", "wake")
 
 				// 执行所有已经到定时的任务
 				for _, job := range c.jobs {
 					if job.Next.After(now) || job.Next.IsZero() {
 						break
 					}
-					c.log.Debugw("job.action", "execute", "job.id", job.Id, "job.name", job.Name)
+					c.log.Debugw("job.action", "execute", "job.id", job.Id)
 					// 是否使用带 recover 的执行方式
 					if c.withRecover {
 						c.executeJobWithRecover(job)
@@ -153,7 +152,7 @@ func (c *Cron) run() {
 				now = c.now()
 				newJob.Next = newJob.Schedule.Next(now)
 				c.jobs = append(c.jobs, newJob)
-				c.log.Infow("job.action", "added", "job.id", newJob.Id, "job.name", newJob.Name, "job.next", newJob.Next.Format(time.RFC3339))
+				c.log.Infow("job.action", "added", "job.id", newJob.Id, "job.next", newJob.Next.Format(time.RFC3339))
 
 			case id := <-c.remove:
 				timer.Stop()
@@ -167,17 +166,11 @@ func (c *Cron) run() {
 				c.removeAllJob()
 				c.log.Infow("job.action", "removed all")
 
-			case name := <-c.removeByName:
+			case prefix := <-c.removeByPrefix:
 				timer.Stop()
 				now = c.now()
-				c.removeJobByName(name)
-				c.log.Infow("job.action", "removed by name", "job.name", name)
-
-			case prefix := <-c.removeByNamePrefix:
-				timer.Stop()
-				now = c.now()
-				c.removeJobByNamePrefix(prefix)
-				c.log.Infow("job.action", "removed by name prefix", "job.name_prefix", prefix)
+				c.removeJobByPrefix(prefix)
+				c.log.Infow("job.action", "removed by prefix", "job.prefix", prefix)
 
 			case <-c.stop:
 				timer.Stop()
@@ -245,24 +238,12 @@ func (c *Cron) removeAllJob() {
 	c.jobs = make([]*job, 0)
 }
 
-// 通过任务名称移除任务，所有名称相同的任务会被移除
-func (c *Cron) removeJobByName(name string) {
+// 通过ID前缀移除任务，所有任务ID含有指定前缀的任务都将移除
+func (c *Cron) removeJobByPrefix(prefix string) {
 	jobs := make([]*job, 0)
 
 	for _, job := range c.jobs {
-		if job.Name != name {
-			jobs = append(jobs, job)
-		}
-	}
-	c.jobs = jobs
-}
-
-// 通过任务名称前缀移除任务，所有任务名称含有指定前缀的任务都将移除
-func (c *Cron) removeJobByNamePrefix(prefix string) {
-	jobs := make([]*job, 0)
-
-	for _, job := range c.jobs {
-		if !strings.HasPrefix(job.Name, prefix) {
+		if !strings.HasPrefix(job.Id, prefix) {
 			jobs = append(jobs, job)
 		}
 	}
@@ -272,7 +253,7 @@ func (c *Cron) removeJobByNamePrefix(prefix string) {
 // 通过 ID 查找任务
 //
 // 返回查找到的任务对象，不存在则返回 nil
-func (c *Cron) findById(id string) *job {
+func (c *Cron) find(id string) *job {
 	for _, job := range c.jobs {
 		if job.Id == id {
 			return job
@@ -288,10 +269,9 @@ func (c *Cron) findById(id string) *job {
 //
 //	expr: 定时表达式
 //	id: 任务ID，每个任务ID唯一
-//	name: 任务名称
 //	fn: 任务执行回调
 //	userdata: 用于保存用户数据，回调时将传递该数据
-func (c *Cron) Add(expr string, id string, name string, fn JobFunc, userdata any) error {
+func (c *Cron) Add(expr string, id string, fn JobFunc, userdata any) error {
 	sched, err := c.parser.Parse(expr)
 	if err != nil {
 		return err
@@ -301,14 +281,13 @@ func (c *Cron) Add(expr string, id string, name string, fn JobFunc, userdata any
 	defer c.lock.Unlock()
 
 	// 判断相同ID任务是否存在
-	found := c.findById(id)
+	found := c.find(id)
 	if found != nil {
 		return fmt.Errorf("%w: %s", ErrJobExist, id)
 	}
 
 	job := &job{
 		Id:       id,
-		Name:     name,
 		Schedule: sched,
 		Func:     fn,
 		Userdata: userdata,
@@ -348,24 +327,13 @@ func (c *Cron) RemoveAll() {
 	}
 }
 
-// 通过任务名称移除任务
-func (c *Cron) RemoveByName(name string) {
+func (c *Cron) RemoveByPrefix(prefix string) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if !c.running {
-		c.removeJobByName(name)
+		c.removeJobByPrefix(prefix)
 	} else {
-		c.removeByName <- name
-	}
-}
-
-func (c *Cron) RemoveByNamePrefix(prefix string) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	if !c.running {
-		c.removeJobByNamePrefix(prefix)
-	} else {
-		c.removeByNamePrefix <- prefix
+		c.removeByPrefix <- prefix
 	}
 }
 

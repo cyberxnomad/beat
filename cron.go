@@ -3,14 +3,11 @@ package cron
 import (
 	"context"
 	"fmt"
-	"os"
 	"runtime"
 	"sort"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/go-kratos/kratos/v2/log"
 )
 
 type JobFunc func(ctx context.Context, userdata any)
@@ -34,7 +31,7 @@ type Cron struct {
 	parser      ScheduleParser  // 解析器
 	location    *time.Location  // 时区
 	ctx         context.Context // 上下文
-	log         *log.Helper     // log
+	log         Logger          // log
 
 	add            chan *job
 	remove         chan string
@@ -83,7 +80,7 @@ func New(opts ...Option) *Cron {
 		parser:   defaultParser,
 		location: time.Local,
 		ctx:      context.Background(),
-		log:      log.NewHelper(log.With(log.NewStdLogger(os.Stdout), "ts", log.DefaultTimestamp, "caller", log.DefaultCaller)),
+		log:      defaultLogger,
 
 		add:            make(chan *job),
 		remove:         make(chan string),
@@ -101,15 +98,15 @@ func New(opts ...Option) *Cron {
 }
 
 func (c *Cron) run() {
-	c.log.Info("started")
-	defer c.log.Info("stopped")
+	c.log.Info("msg", "started")
+	defer c.log.Info("msg", "stopped")
 
 	now := c.now()
 
 	// 获取一次所有任务的下一次有效时间
 	for _, job := range c.jobs {
 		job.Next = job.Schedule.Next(now)
-		c.log.Infow("job.action", "schedule", "job.id", job.Id, "job.next", job.Next.Format(time.RFC3339))
+		c.log.Info("job.action", "schedule", "job.id", job.Id, "job.next", job.Next.Format(time.RFC3339))
 	}
 
 	for {
@@ -129,14 +126,14 @@ func (c *Cron) run() {
 			select {
 			case now = <-timer.C:
 				now = now.In(c.location)
-				c.log.Debugw("job.action", "wake")
+				c.log.Debug("job.action", "wake")
 
 				// 执行所有已经到定时的任务
 				for _, job := range c.jobs {
 					if job.Next.After(now) || job.Next.IsZero() {
 						break
 					}
-					c.log.Debugw("job.action", "execute", "job.id", job.Id)
+					c.log.Debug("job.action", "execute", "job.id", job.Id)
 					// 是否使用带 recover 的执行方式
 					if c.withRecover {
 						c.executeJobWithRecover(job)
@@ -152,29 +149,29 @@ func (c *Cron) run() {
 				now = c.now()
 				newJob.Next = newJob.Schedule.Next(now)
 				c.jobs = append(c.jobs, newJob)
-				c.log.Infow("job.action", "added", "job.id", newJob.Id, "job.next", newJob.Next.Format(time.RFC3339))
+				c.log.Info("job.action", "add", "job.id", newJob.Id, "job.next", newJob.Next.Format(time.RFC3339))
 
 			case id := <-c.remove:
 				timer.Stop()
 				now = c.now()
 				c.removeJob(id)
-				c.log.Infow("job.action", "removed", "job.id", id)
+				c.log.Info("job.action", "remove", "job.id", id)
 
 			case <-c.removeAll:
 				timer.Stop()
 				now = c.now()
 				c.removeAllJob()
-				c.log.Infow("job.action", "removed all")
+				c.log.Info("job.action", "remove-all")
 
 			case prefix := <-c.removeByPrefix:
 				timer.Stop()
 				now = c.now()
 				c.removeJobByPrefix(prefix)
-				c.log.Infow("job.action", "removed by prefix", "job.prefix", prefix)
+				c.log.Info("job.action", "remove-by-prefix", "job.prefix", prefix)
 
 			case <-c.stop:
 				timer.Stop()
-				c.log.Infow("job.action", "stop")
+				c.log.Info("job.action", "stop")
 				return
 			}
 
@@ -210,7 +207,7 @@ func (c *Cron) executeJobWithRecover(job *job) {
 				buf := make([]byte, 64<<10)
 				n := runtime.Stack(buf, false)
 				buf = buf[:n]
-				c.log.Errorw("panic", r, "statck", buf)
+				c.log.Error("panic", r, "statck", buf)
 			}
 		}()
 
@@ -403,7 +400,7 @@ func (c *Cron) IsRunning() bool {
 	return c.running
 }
 
-func (c *Cron) SetLogger(log *log.Helper) {
+func (c *Cron) SetLogger(log Logger) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 

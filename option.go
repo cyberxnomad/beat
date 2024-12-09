@@ -2,8 +2,6 @@ package cron
 
 import (
 	"time"
-
-	"github.com/go-kratos/kratos/v2/log"
 )
 
 type Option func(*Cron)
@@ -26,7 +24,7 @@ func WithLocation(location *time.Location) Option {
 	}
 }
 
-func WithLogger(log *log.Helper) Option {
+func WithLogger(log Logger) Option {
 	return func(c *Cron) {
 		c.log = log
 	}

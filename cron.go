@@ -2,7 +2,6 @@ package cron
 
 import (
 	"context"
-	"fmt"
 	"runtime"
 	"sort"
 	"strings"
@@ -151,7 +150,7 @@ func (c *Cron) run() {
 					newJob := (*job)(arg)
 
 					newJob.Next = newJob.Schedule.Next(now)
-					c.jobs = append(c.jobs, newJob)
+					c.addJob(newJob)
 
 					c.log.Info("job.action", "add", "job.id", newJob.Id, "job.next", newJob.Next.Format(time.RFC3339))
 
@@ -220,6 +219,16 @@ func (c *Cron) executeJobWithRecover(job *job) {
 	}()
 }
 
+func (c *Cron) addJob(job *job) {
+	found := c.find(job.Id)
+	if found != nil {
+		c.log.Warn("msg", "job already exists, overwrite the old one", "job.id", found.Id)
+		c.removeJob(found.Id)
+	}
+
+	c.jobs = append(c.jobs, job)
+}
+
 // 移除任务
 //
 // 返回移除的任务对象，不存在则返回 nil
@@ -281,12 +290,6 @@ func (c *Cron) Add(expr string, id string, fn JobFunc, userdata any) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	// 判断相同ID任务是否存在
-	found := c.find(id)
-	if found != nil {
-		return fmt.Errorf("%w: %s", ErrJobExist, id)
-	}
-
 	job := &job{
 		Id:       id,
 		Schedule: sched,
@@ -298,7 +301,7 @@ func (c *Cron) Add(expr string, id string, fn JobFunc, userdata any) error {
 	}
 
 	if !c.running {
-		c.jobs = append(c.jobs, job)
+		c.addJob(job)
 	} else {
 		c.operate <- opAdd(job)
 	}

@@ -33,12 +33,7 @@ type Cron struct {
 	ctx         context.Context // 上下文
 	log         Logger          // log
 
-	add            chan *job
-	remove         chan string
-	removeAll      chan struct{}
-	removeByName   chan string
-	removeByPrefix chan string
-	stop           chan struct{}
+	operate chan any
 }
 
 type ScheduleParser interface {
@@ -72,6 +67,14 @@ func (s jobByTime) Less(i, j int) bool {
 	return s[i].Next.Before(s[j].Next)
 }
 
+type (
+	opAdd            *job
+	opRemove         string
+	opRemoveAll      struct{}
+	opRemoveByPrefix string
+	opStop           struct{}
+)
+
 func emptyJobFunc(_ context.Context, _ any) {}
 
 func New(opts ...Option) *Cron {
@@ -82,12 +85,7 @@ func New(opts ...Option) *Cron {
 		ctx:      context.Background(),
 		log:      defaultLogger,
 
-		add:            make(chan *job),
-		remove:         make(chan string),
-		removeAll:      make(chan struct{}),
-		removeByName:   make(chan string),
-		removeByPrefix: make(chan string),
-		stop:           make(chan struct{}),
+		operate: make(chan any),
 	}
 
 	for _, opt := range opts {
@@ -144,35 +142,41 @@ func (c *Cron) run() {
 					job.Next = job.Schedule.Next(now)
 				}
 
-			case newJob := <-c.add:
+			case op := <-c.operate:
 				timer.Stop()
 				now = c.now()
-				newJob.Next = newJob.Schedule.Next(now)
-				c.jobs = append(c.jobs, newJob)
-				c.log.Info("job.action", "add", "job.id", newJob.Id, "job.next", newJob.Next.Format(time.RFC3339))
 
-			case id := <-c.remove:
-				timer.Stop()
-				now = c.now()
-				c.removeJob(id)
-				c.log.Info("job.action", "remove", "job.id", id)
+				switch arg := op.(type) {
+				case opAdd:
+					newJob := (*job)(arg)
 
-			case <-c.removeAll:
-				timer.Stop()
-				now = c.now()
-				c.removeAllJob()
-				c.log.Info("job.action", "remove-all")
+					newJob.Next = newJob.Schedule.Next(now)
+					c.jobs = append(c.jobs, newJob)
 
-			case prefix := <-c.removeByPrefix:
-				timer.Stop()
-				now = c.now()
-				c.removeJobByPrefix(prefix)
-				c.log.Info("job.action", "remove-by-prefix", "job.prefix", prefix)
+					c.log.Info("job.action", "add", "job.id", newJob.Id, "job.next", newJob.Next.Format(time.RFC3339))
 
-			case <-c.stop:
-				timer.Stop()
-				c.log.Info("job.action", "stop")
-				return
+				case opRemove:
+					id := string(arg)
+
+					c.removeJob(id)
+
+					c.log.Info("job.action", "remove", "job.id", id)
+
+				case opRemoveAll:
+					c.removeAllJob()
+
+					c.log.Info("job.action", "remove-all")
+
+				case opRemoveByPrefix:
+					prefix := string(arg)
+
+					c.removeJobByPrefix(prefix)
+
+					c.log.Info("job.action", "remove-by-prefix", "job.prefix", prefix)
+
+				case opStop:
+					return
+				}
 			}
 
 			break
@@ -296,7 +300,7 @@ func (c *Cron) Add(expr string, id string, fn JobFunc, userdata any) error {
 	if !c.running {
 		c.jobs = append(c.jobs, job)
 	} else {
-		c.add <- job
+		c.operate <- opAdd(job)
 	}
 
 	return nil
@@ -309,7 +313,7 @@ func (c *Cron) Remove(id string) {
 	if !c.running {
 		c.removeJob(id)
 	} else {
-		c.remove <- id
+		c.operate <- opRemove(id)
 	}
 }
 
@@ -320,7 +324,7 @@ func (c *Cron) RemoveAll() {
 	if !c.running {
 		c.removeAllJob()
 	} else {
-		c.removeAll <- struct{}{}
+		c.operate <- opRemoveAll(struct{}{})
 	}
 }
 
@@ -330,7 +334,7 @@ func (c *Cron) RemoveByPrefix(prefix string) {
 	if !c.running {
 		c.removeJobByPrefix(prefix)
 	} else {
-		c.removeByPrefix <- prefix
+		c.operate <- opRemoveByPrefix(prefix)
 	}
 }
 
@@ -339,7 +343,7 @@ func (c *Cron) Stop() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if c.running {
-		c.stop <- struct{}{}
+		c.operate <- opStop(struct{}{})
 		c.running = false
 	}
 	c.jobWaiter.Wait()

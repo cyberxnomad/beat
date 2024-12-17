@@ -313,6 +313,7 @@ func (c *Cron) Add(expr string, id string, fn JobFunc, userdata any) error {
 func (c *Cron) Remove(id string) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
 	if !c.running {
 		c.removeJob(id)
 	} else {
@@ -324,6 +325,7 @@ func (c *Cron) Remove(id string) {
 func (c *Cron) RemoveAll() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
 	if !c.running {
 		c.removeAllJob()
 	} else {
@@ -334,6 +336,7 @@ func (c *Cron) RemoveAll() {
 func (c *Cron) RemoveByPrefix(prefix string) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
 	if !c.running {
 		c.removeJobByPrefix(prefix)
 	} else {
@@ -345,6 +348,7 @@ func (c *Cron) RemoveByPrefix(prefix string) {
 func (c *Cron) Stop() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
 	if c.running {
 		c.operate <- opStop(struct{}{})
 		c.running = false
@@ -356,9 +360,11 @@ func (c *Cron) Stop() {
 func (c *Cron) Start() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
 	if c.running {
 		return
 	}
+
 	c.running = true
 	go c.run()
 }
@@ -366,9 +372,11 @@ func (c *Cron) Start() {
 func (c *Cron) StartWithContext(ctx context.Context) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
 	if c.running {
 		return
 	}
+
 	c.ctx = ctx
 	c.running = true
 	go c.run()
@@ -377,10 +385,12 @@ func (c *Cron) StartWithContext(ctx context.Context) {
 // 开始运行，cron 将阻塞运行
 func (c *Cron) Run() {
 	c.lock.Lock()
+
 	if c.running {
 		c.lock.Unlock()
 		return
 	}
+
 	c.running = true
 	c.lock.Unlock()
 	c.run()
@@ -389,10 +399,12 @@ func (c *Cron) Run() {
 // 开始运行，cron 将阻塞运行
 func (c *Cron) RunWithContext(ctx context.Context) {
 	c.lock.Lock()
+
 	if c.running {
 		c.lock.Unlock()
 		return
 	}
+
 	c.ctx = ctx
 	c.running = true
 	c.lock.Unlock()

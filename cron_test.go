@@ -167,6 +167,31 @@ func TestRemoveWhileRunning(t *testing.T) {
 	}
 }
 
+// Start cron, add a job, remove it by pattern, expect it doesn't run.
+func TestRemoveByPattern(t *testing.T) {
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	id := "TestRemoveByPattern-1"
+
+	cron := New()
+	cron.Start()
+	defer cron.Stop()
+	cron.Add("* * * * * * *", id,
+		func(ctx context.Context, userdata any) { wg.Done() },
+		nil)
+
+	err := cron.RemoveByPattern("^TestRemoveByPattern-.*$")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-time.After(OneSecond):
+	case <-wait(wg):
+		t.FailNow()
+	}
+}
+
 // Test that the jobs are correctly sorted.
 // Add a bunch of long-in-the-future jobs, and an immediate job, and ensure
 // that the immediate job runs immediately.

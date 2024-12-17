@@ -2,9 +2,9 @@ package cron
 
 import (
 	"context"
+	"regexp"
 	"runtime"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 )
@@ -67,11 +67,11 @@ func (s jobByTime) Less(i, j int) bool {
 }
 
 type (
-	opAdd            *job
-	opRemove         string
-	opRemoveAll      struct{}
-	opRemoveByPrefix string
-	opStop           struct{}
+	opAdd             *job
+	opRemove          string
+	opRemoveAll       struct{}
+	opRemoveByPattern *regexp.Regexp
+	opStop            struct{}
 )
 
 func emptyJobFunc(_ context.Context, _ any) {}
@@ -166,12 +166,12 @@ func (c *Cron) run() {
 
 					c.log.Info("job.action", "remove-all")
 
-				case opRemoveByPrefix:
-					prefix := string(arg)
+				case opRemoveByPattern:
+					pattern := (*regexp.Regexp)(arg)
 
-					c.removeJobByPrefix(prefix)
+					c.removeJobByPattern(pattern)
 
-					c.log.Info("job.action", "remove-by-prefix", "job.prefix", prefix)
+					c.log.Info("job.action", "remove-by-pattern", "job.pattern", pattern.String())
 
 				case opStop:
 					return
@@ -249,14 +249,15 @@ func (c *Cron) removeAllJob() {
 }
 
 // 通过ID前缀移除任务，所有任务ID含有指定前缀的任务都将移除
-func (c *Cron) removeJobByPrefix(prefix string) {
+func (c *Cron) removeJobByPattern(pattern *regexp.Regexp) {
 	jobs := make([]*job, 0)
 
 	for _, job := range c.jobs {
-		if !strings.HasPrefix(job.Id, prefix) {
+		if !pattern.MatchString(job.Id) {
 			jobs = append(jobs, job)
 		}
 	}
+
 	c.jobs = jobs
 }
 
@@ -333,15 +334,23 @@ func (c *Cron) RemoveAll() {
 	}
 }
 
-func (c *Cron) RemoveByPrefix(prefix string) {
+// 通过正则表达式移除任务
+func (c *Cron) RemoveByPattern(exp string) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if !c.running {
-		c.removeJobByPrefix(prefix)
-	} else {
-		c.operate <- opRemoveByPrefix(prefix)
+	pattern, err := regexp.Compile(exp)
+	if err != nil {
+		return err
 	}
+
+	if !c.running {
+		c.removeJobByPattern(pattern)
+	} else {
+		c.operate <- opRemoveByPattern(pattern)
+	}
+
+	return nil
 }
 
 // 停止运行

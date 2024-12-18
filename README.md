@@ -10,7 +10,7 @@
 ### 功能：  
 
 - 支持年、秒
-  - 默认时间表达式：[year] [month] [day] [weekday] [hour] [minute] [second]  
+  - 默认时间表达式：`[year] [month] [day] [weekday] [hour] [minute] [second]`  
   - 可通过 parser 中的 layout 参数来支持自定义时间表达式  
 
 - 允许的符号：`,`(多个时间), `-`(范围), `/`(步长), `*`(通配)  

@@ -10,7 +10,7 @@ Based on: https://github.com/robfig/cron (v3)
 ### Features:  
 
 - Support year and second
-  - Default time expression: [year] [month] [day] [weekday] [hour] [minute] [second]  
+  - Default time expression: `[year] [month] [day] [weekday] [hour] [minute] [second]`  
   - Customized time expressions can be supported via the layout parameter in the parser.  
 
 - Allowed symbols: `,`, `-`, `/`, `*`.  

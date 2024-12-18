@@ -23,7 +23,6 @@ var DefaultLayout = []LayoutField{Year, Month, Dom, Dow, Hour, Minute, Second}
 
 type Parser struct {
 	layout         []LayoutField
-	validFields    LayoutField
 	defaultLoction *time.Location // 缺省时区，解析时未指定时区则以该参数时区解析
 }
 
@@ -36,8 +35,7 @@ type SchedTime struct {
 	Minute uint64    // 分
 	Second uint64    // 秒
 
-	validFields LayoutField
-	location    *time.Location
+	location *time.Location
 }
 
 var defaultParser = NewParser()
@@ -49,10 +47,6 @@ func NewParser(opts ...ParserOption) *Parser {
 
 	for _, opt := range opts {
 		opt(p)
-	}
-
-	for i := range p.layout {
-		p.validFields |= p.layout[i]
 	}
 
 	return p
@@ -102,7 +96,6 @@ func (p *Parser) Parse(exp string) (Schedule, error) {
 	}
 
 	st := new(SchedTime)
-	st.validFields = p.validFields
 	st.location = p.defaultLoction
 
 	for i := range p.layout {

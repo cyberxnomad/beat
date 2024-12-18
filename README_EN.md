@@ -1,13 +1,17 @@
 ## cron
 
-[中文](README.md) | English
+[中文](README.md) | English  
 
-Based on project: https://github.com/robfig/cron (v3)
+> [!NOTE]  
+> This program is not a standard cron implementation and is only compatible with part of the standard cron features.  
 
-Functions:  
+Based on: https://github.com/robfig/cron (v3)  
 
-- Default time expression: [year] [month] [day] [weekday] [hour] [minute] [second]  
-  - Customized time expressions can be supported via the layout parameter in the parser.
+### Features:  
+
+- Support year and second
+  - Default time expression: [year] [month] [day] [weekday] [hour] [minute] [second]  
+  - Customized time expressions can be supported via the layout parameter in the parser.  
 
 - Allowed symbols: `,`, `-`, `/`, `*`.  
   - Not supported `? `  
@@ -18,7 +22,7 @@ Functions:
 
 - DST (Daylight Saving Time) is not supported.  
 
-TODO.  
+### TODO:  
 
 - [x] custom logger support  
 - [ ] Expressions support time zones  

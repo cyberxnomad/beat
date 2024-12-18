@@ -378,19 +378,6 @@ func (c *Cron) Start() {
 	go c.run()
 }
 
-func (c *Cron) StartWithContext(ctx context.Context) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	if c.running {
-		return
-	}
-
-	c.ctx = ctx
-	c.running = true
-	go c.run()
-}
-
 // 开始运行，cron 将阻塞运行
 func (c *Cron) Run() {
 	c.lock.Lock()
@@ -400,21 +387,6 @@ func (c *Cron) Run() {
 		return
 	}
 
-	c.running = true
-	c.lock.Unlock()
-	c.run()
-}
-
-// 开始运行，cron 将阻塞运行
-func (c *Cron) RunWithContext(ctx context.Context) {
-	c.lock.Lock()
-
-	if c.running {
-		c.lock.Unlock()
-		return
-	}
-
-	c.ctx = ctx
 	c.running = true
 	c.lock.Unlock()
 	c.run()

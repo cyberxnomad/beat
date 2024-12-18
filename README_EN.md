@@ -15,6 +15,8 @@ Based on: https://github.com/robfig/cron (v3)
 
 - Allowed symbols: `,`, `-`, `/`, `*`.  
   - Not supported `? `  
+  
+- Months in expressions are numeric only, not in the form `Jan`, `Feb`, etc. Weeks are numeric only, not in the form `Mon`, `Tue`, etc.  
 
 - Expressions do not support time zones currently.  
 

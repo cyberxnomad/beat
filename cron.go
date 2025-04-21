@@ -113,7 +113,10 @@ func (c *Cron) run() {
 		var timer *time.Timer
 		if len(c.jobs) == 0 || c.jobs[0].Next.IsZero() {
 			// 没有任务或者时间太长，则休眠，依然可以处理添加或者停止请求
-			timer = time.NewTimer(100000 * time.Hour)
+			//
+			// 目前 parser 的最长时间为 2 年，防止休眠时间过长错过 2 年后
+			// 的任务，此处休眠时间暂定为 1 年 (8760个小时)
+			timer = time.NewTimer(8760 * time.Hour)
 		} else {
 			// 获取最近执行时间的定时
 			timer = time.NewTimer(c.jobs[0].Next.Sub(now))

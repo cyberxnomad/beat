@@ -97,9 +97,24 @@ func (p *Parser) Parse(exp string) (Schedule, error) {
 
 	st := new(SchedTime)
 	st.location = p.defaultLoction
+	offset := 0
+
+	if loc, found := strings.CutPrefix(fields[0], "TZ="); found {
+		if len(fields)-1 < len(p.layout) {
+			return nil, fmt.Errorf("%w: invalid number of fields", ErrInvalidExp)
+		}
+
+		location, err := time.LoadLocation(loc)
+		if err != nil {
+			return nil, fmt.Errorf("bad location '%s': %v", loc, err)
+		}
+
+		st.location = location
+		offset = 1
+	}
 
 	for i := range p.layout {
-		bits, err := parseField(fields[i], p.layout[i])
+		bits, err := parseField(fields[i+offset], p.layout[i])
 		if err != nil {
 			return nil, err
 		}

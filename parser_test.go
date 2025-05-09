@@ -1,6 +1,7 @@
 package cron
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -120,24 +121,55 @@ func TestDomAndDow(t *testing.T) {
 }
 
 func TestParserTimeZone(t *testing.T) {
-	// TODO: implement
-	// now := time.Now().Truncate(time.Second)
-	// tm := now.Add(2 * time.Second)
+	now := time.Now().Truncate(time.Second).In(time.UTC)
+	expect := now.Add(5 * time.Second)
 
-	// fmt.Println("now     ", now)
-	// fmt.Println("expected", tm)
+	shanghaiLoc, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		panic(err)
+	}
 
-	// expr := fmt.Sprintf("%d %d %d %d %d %d %d", tm.Year(), tm.Month(), tm.Day(), tm.Weekday(), tm.Hour(), tm.Minute(), tm.Second())
+	tests := []struct {
+		spec     string
+		expected bool
+	}{
+		{
+			fmt.Sprintf("%d %d %d %d %d %d %d",
+				expect.Year(), expect.Month(), expect.Day(), expect.Weekday(),
+				expect.Hour(), expect.Minute(), expect.Second()),
+			true,
+		},
+		{
+			fmt.Sprintf("TZ=Asia/Shanghai %d %d %d %d %d %d %d",
+				expect.In(shanghaiLoc).Year(), expect.In(shanghaiLoc).Month(), expect.In(shanghaiLoc).Day(), expect.In(shanghaiLoc).Weekday(),
+				expect.In(shanghaiLoc).Hour(), expect.In(shanghaiLoc).Minute(), expect.In(shanghaiLoc).Second()),
+			true,
+		},
+		{
+			fmt.Sprintf("TZ=Asia/Shanghai %d %d %d %d %d %d %d",
+				expect.Year(), expect.Month(), expect.Day(), expect.Weekday(),
+				expect.Hour(), expect.Minute(), expect.Second()),
+			false,
+		},
+		{
+			fmt.Sprintf("TZ=Asia/Tokyo %d %d %d %d %d %d %d",
+				expect.In(shanghaiLoc).Year(), expect.In(shanghaiLoc).Month(), expect.In(shanghaiLoc).Day(), expect.In(shanghaiLoc).Weekday(),
+				expect.In(shanghaiLoc).Hour(), expect.In(shanghaiLoc).Minute(), expect.In(shanghaiLoc).Second()),
+			false,
+		},
+	}
 
-	// sched, err := defaultParser.Parse(expr)
-	// if err != nil {
-	// 	panic(err)
-	// }
+	for _, test := range tests {
+		sched, err := defaultParser.Parse(test.spec)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+		actual := sched.Next(now)
 
-	// actual := sched.Next(now)
-
-	// if tm != actual {
-	// 	t.Errorf("Fail evaluating %s: (expected) %s != %s (actual)",
-	// 		expr, tm, actual)
-	// }
+		if (test.expected && expect != actual) || (!test.expected && expect == actual) {
+			t.Errorf("Fail evaluating %s on %s: (expected) %s != %s (actual)",
+				test.spec, expect, expect, actual)
+		}
+	}
 }

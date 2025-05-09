@@ -76,7 +76,7 @@ type (
 
 func emptyJobFunc(_ context.Context, _ any) {}
 
-func New(opts ...Option) *Beat {
+func New(opts ...option) *Beat {
 	b := &Beat{
 		jobs:     []*job{},
 		parser:   defaultParser,

@@ -40,7 +40,7 @@ type SchedTime struct {
 
 var defaultParser = NewParser()
 
-func NewParser(opts ...ParserOption) *Parser {
+func NewParser(opts ...parserOption) *Parser {
 	p := new(Parser)
 	p.layout = DefaultLayout
 	p.defaultLoction = time.Local

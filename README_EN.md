@@ -27,5 +27,5 @@ Based on: https://github.com/robfig/cron (v3)
 ### TODO:  
 
 - [x] custom logger support  
-- [ ] Expressions support time zones  
+- [x] Expressions support time zones  
 - [ ] support for querying the current job  

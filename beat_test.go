@@ -1,4 +1,4 @@
-package cron
+package beat
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 // compensate for a few milliseconds of runtime.
 const OneSecond = 1*time.Second + 50*time.Millisecond
 
-func stop(c *Cron) chan bool {
+func stop(c *Beat) chan bool {
 	ch := make(chan bool)
 	go func() {
 		c.Stop()
@@ -23,15 +23,15 @@ func stop(c *Cron) chan bool {
 	return ch
 }
 
-// Start and stop cron with no jobs.
+// Start and stop beat with no jobs.
 func TestNoJobs(t *testing.T) {
-	cron := New()
-	cron.Start()
+	beat := New()
+	beat.Start()
 
 	select {
 	case <-time.After(OneSecond):
-		t.Fatal("expected cron will be stopped immediately")
-	case <-stop(cron):
+		t.Fatal("expected beat will be stopped immediately")
+	case <-stop(beat):
 	}
 }
 
@@ -49,10 +49,10 @@ func TestStopCausesJobsToNotRun(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 
-	cron := New()
-	cron.Start()
-	cron.Stop()
-	cron.Add("* * * * * * *", "TestStopCausesJobsToNotRun-1",
+	beat := New()
+	beat.Start()
+	beat.Stop()
+	beat.Add("* * * * * * *", "TestStopCausesJobsToNotRun-1",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
@@ -60,23 +60,23 @@ func TestStopCausesJobsToNotRun(t *testing.T) {
 	case <-time.After(OneSecond):
 		// No job ran!
 	case <-wait(wg):
-		t.Fatal("expected stopped cron does not run any job")
+		t.Fatal("expected stopped beat does not run any job")
 	}
 }
 
-// Add a job, start cron, expect it runs.
+// Add a job, start beat, expect it runs.
 func TestAddBeforeRunning(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 
-	cron := New()
-	cron.Add("* * * * * * *", "TestAddBeforeRunning-1",
+	beat := New()
+	beat.Add("* * * * * * *", "TestAddBeforeRunning-1",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
-	cron.Start()
-	defer cron.Stop()
+	beat.Start()
+	defer beat.Stop()
 
-	// Give cron 2 seconds to run our job (which is always activated).
+	// Give beat 2 seconds to run our job (which is always activated).
 	select {
 	case <-time.After(OneSecond):
 		t.Fatal("expected job runs")
@@ -84,15 +84,15 @@ func TestAddBeforeRunning(t *testing.T) {
 	}
 }
 
-// Start cron, add a job, expect it runs.
+// Start beat, add a job, expect it runs.
 func TestAddWhileRunning(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 
-	cron := New()
-	cron.Start()
-	defer cron.Stop()
-	cron.Add("* * * * * * *", "TestAddWhileRunning-1",
+	beat := New()
+	beat.Start()
+	defer beat.Stop()
+	beat.Add("* * * * * * *", "TestAddWhileRunning-1",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
@@ -105,15 +105,15 @@ func TestAddWhileRunning(t *testing.T) {
 
 // Adding a job after calling start results in multiple job invocations
 func TestAddWhileRunningWithDelay(t *testing.T) {
-	cron := New()
-	cron.Start()
-	defer cron.Stop()
+	beat := New()
+	beat.Start()
+	defer beat.Stop()
 
 	time.Sleep(5 * time.Second)
 
 	var calls int64
 
-	cron.Add("* * * * * * *", "TestAddWhileRunningWithDelay-1",
+	beat.Add("* * * * * * *", "TestAddWhileRunningWithDelay-1",
 		func(ctx context.Context, userdata any) { atomic.AddInt64(&calls, 1) },
 		nil)
 
@@ -123,20 +123,20 @@ func TestAddWhileRunningWithDelay(t *testing.T) {
 	}
 }
 
-// Add a job, remove a job, start cron, expect nothing runs.
+// Add a job, remove a job, start beat, expect nothing runs.
 func TestRemoveBeforeRunning(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	id := "TestRemoveBeforeRunning-1"
 
-	cron := New()
+	beat := New()
 
-	cron.Add("* * * * * * *", id,
+	beat.Add("* * * * * * *", id,
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
-	cron.Remove(id)
-	cron.Start()
-	defer cron.Stop()
+	beat.Remove(id)
+	beat.Start()
+	defer beat.Stop()
 
 	select {
 	case <-time.After(OneSecond):
@@ -146,19 +146,19 @@ func TestRemoveBeforeRunning(t *testing.T) {
 	}
 }
 
-// Start cron, add a job, remove it, expect it doesn't run.
+// Start beat, add a job, remove it, expect it doesn't run.
 func TestRemoveWhileRunning(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	id := "TestRemoveWhileRunning-1"
 
-	cron := New()
-	cron.Start()
-	defer cron.Stop()
-	cron.Add("* * * * * * *", id,
+	beat := New()
+	beat.Start()
+	defer beat.Stop()
+	beat.Add("* * * * * * *", id,
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
-	cron.Remove(id)
+	beat.Remove(id)
 
 	select {
 	case <-time.After(OneSecond):
@@ -167,20 +167,20 @@ func TestRemoveWhileRunning(t *testing.T) {
 	}
 }
 
-// Start cron, add a job, remove it by pattern, expect it doesn't run.
+// Start beat, add a job, remove it by pattern, expect it doesn't run.
 func TestRemoveByPattern(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	id := "TestRemoveByPattern-1"
 
-	cron := New()
-	cron.Start()
-	defer cron.Stop()
-	cron.Add("* * * * * * *", id,
+	beat := New()
+	beat.Start()
+	defer beat.Stop()
+	beat.Add("* * * * * * *", id,
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
-	err := cron.RemoveByPattern("^TestRemoveByPattern-.*$")
+	err := beat.RemoveByPattern("^TestRemoveByPattern-.*$")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,36 +200,36 @@ func TestMultipleJobs(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
 
-	cron := New()
-	cron.Add("* 1 1 * 0 0 0", "TestMultipleJobs-1",
+	beat := New()
+	beat.Add("* 1 1 * 0 0 0", "TestMultipleJobs-1",
 		func(ctx context.Context, userdata any) {},
 		nil)
 
-	cron.Add("* * * * * * *", "TestMultipleJobs-2",
+	beat.Add("* * * * * * *", "TestMultipleJobs-2",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
-	cron.Add("* * * * * * *", "TestMultipleJobs-3",
+	beat.Add("* * * * * * *", "TestMultipleJobs-3",
 		func(ctx context.Context, userdata any) { t.Fatal() },
 		nil)
 
-	cron.Add("* * * * * * *", "TestMultipleJobs-4",
+	beat.Add("* * * * * * *", "TestMultipleJobs-4",
 		func(ctx context.Context, userdata any) { t.Fatal() },
 		nil)
 
-	cron.Add("* 12 31 * 0 0 0",
+	beat.Add("* 12 31 * 0 0 0",
 		"TestMultipleJobs-5",
 		func(ctx context.Context, userdata any) {},
 		nil)
 
-	cron.Add("* * * * * * *", "TestMultipleJobs-6",
+	beat.Add("* * * * * * *", "TestMultipleJobs-6",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
-	cron.Remove("TestMultipleJobs-3")
-	cron.Start()
-	cron.Remove("TestMultipleJobs-4")
-	defer cron.Stop()
+	beat.Remove("TestMultipleJobs-3")
+	beat.Start()
+	beat.Remove("TestMultipleJobs-4")
+	defer beat.Stop()
 
 	select {
 	case <-time.After(OneSecond):
@@ -243,21 +243,21 @@ func TestRunningJobTwice(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
 
-	cron := New()
-	cron.Add("* 1 1 * 0 0 0", "TestRunningJobTwice-1",
+	beat := New()
+	beat.Add("* 1 1 * 0 0 0", "TestRunningJobTwice-1",
 		func(ctx context.Context, userdata any) {},
 		nil)
 
-	cron.Add("* 12 31 * 0 0 0", "TestRunningJobTwice-2",
+	beat.Add("* 12 31 * 0 0 0", "TestRunningJobTwice-2",
 		func(ctx context.Context, userdata any) {},
 		nil)
 
-	cron.Add("* * * * * * *", "TestRunningJobTwice-3",
+	beat.Add("* * * * * * *", "TestRunningJobTwice-3",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
-	cron.Start()
-	defer cron.Stop()
+	beat.Start()
+	defer beat.Stop()
 
 	select {
 	case <-time.After(2 * OneSecond):
@@ -270,19 +270,19 @@ func TestRunningJobTwice(t *testing.T) {
 func TestStartNoop(t *testing.T) {
 	var tickChan = make(chan struct{}, 2)
 
-	cron := New()
+	beat := New()
 
-	cron.Add("* * * * * * *", "TestStartNoop-1",
+	beat.Add("* * * * * * *", "TestStartNoop-1",
 		func(ctx context.Context, userdata any) { userdata.(chan struct{}) <- struct{}{} },
 		tickChan)
 
-	cron.Start()
-	defer cron.Stop()
+	beat.Start()
+	defer beat.Stop()
 
 	// Wait for the first firing to ensure the runner is going
 	<-tickChan
 
-	cron.Start()
+	beat.Start()
 
 	<-tickChan
 
@@ -298,7 +298,7 @@ func TestLocalTimezone(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
 
-	cron := New()
+	beat := New()
 
 	tm := time.Now()
 	if tm.Second() >= 58 {
@@ -307,14 +307,14 @@ func TestLocalTimezone(t *testing.T) {
 	}
 
 	expr := fmt.Sprintf("%d %d %d %d %d %d %d,%d", tm.Year(), tm.Month(), tm.Day(), tm.Weekday(), tm.Hour(), tm.Minute(), tm.Second()+1, tm.Second()+2)
-	cron.Add(expr, "TestLocalTimezone-1",
+	beat.Add(expr, "TestLocalTimezone-1",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
-	cron.Start()
-	defer cron.Stop()
+	beat.Start()
+	defer beat.Stop()
 
-	// Give cron 2 seconds to run our job (which is always activated).
+	// Give beat 2 seconds to run our job (which is always activated).
 	select {
 	case <-time.After(OneSecond * 2):
 		t.Fatal("expected job runs", expr)
@@ -331,7 +331,7 @@ func TestNonLocalTimezone(t *testing.T) {
 		panic(err)
 	}
 
-	cron := New(
+	beat := New(
 		WithLocation(loc),
 	)
 
@@ -345,14 +345,14 @@ func TestNonLocalTimezone(t *testing.T) {
 		tm.Year(), tm.Month(), tm.Day(), tm.Weekday(),
 		tm.Hour(), tm.Minute(), tm.Second()+1, tm.Second()+2)
 
-	cron.Add(expr, "TestNonLocalTimezone-1",
+	beat.Add(expr, "TestNonLocalTimezone-1",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
-	cron.Start()
-	defer cron.Stop()
+	beat.Start()
+	defer beat.Stop()
 
-	// Give cron 2 seconds to run our job (which is always activated).
+	// Give beat 2 seconds to run our job (which is always activated).
 	select {
 	case <-time.After(OneSecond * 2):
 		t.Fatal("expected job runs", expr)
@@ -369,7 +369,7 @@ func TestParserWithNonLocalTimezone(t *testing.T) {
 		panic(err)
 	}
 
-	cron := New(
+	beat := New(
 		WithParser(
 			NewParser(
 				WithDefaultLocation(loc),
@@ -387,14 +387,14 @@ func TestParserWithNonLocalTimezone(t *testing.T) {
 		tm.Year(), tm.Month(), tm.Day(), tm.Weekday(),
 		tm.Hour(), tm.Minute(), tm.Second()+1, tm.Second()+2)
 
-	cron.Add(expr, "TestParserWithNonLocalTimezone-1",
+	beat.Add(expr, "TestParserWithNonLocalTimezone-1",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
-	cron.Start()
-	defer cron.Stop()
+	beat.Start()
+	defer beat.Stop()
 
-	// Give cron 2 seconds to run our job (which is always activated).
+	// Give beat 2 seconds to run our job (which is always activated).
 	select {
 	case <-time.After(OneSecond * 2):
 		t.Fatal("expected job runs", expr)

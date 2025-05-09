@@ -1,11 +1,15 @@
-## cron
+## Beat
 
 中文 | [English](README_EN.md)  
 
-> [!NOTE]  
-> 此程序并非标准的 cron 实现，仅兼容部分标准 cron 特性。  
+> [!IMPORTANT]  
+> 为了防止和标准实现的 Cron 库混淆，我们将名称改为 Beat 。
 
-基于项目：https://github.com/robfig/cron (v3)  
+Beat 是一个类似 cron 的定时库。
+
+此程序并非标准的 cron 实现，仅兼容部分标准 cron 特性。  
+
+基于项目：https://github.com/robfig/beat (v3)  
 
 ### 功能：  
 

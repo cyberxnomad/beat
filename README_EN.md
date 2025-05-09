@@ -1,11 +1,16 @@
-## cron
+## Beat
 
 [中文](README.md) | English  
 
-> [!NOTE]  
-> This program is not a standard cron implementation and is only compatible with part of the standard cron features.  
+> [!IMPORTANT]  
+> To prevent confusion with the standard implementation of Cron libraries, 
+> we have changed the name to Beat.
 
-Based on: https://github.com/robfig/cron (v3)  
+Beat is a scheduling library similar to cron.
+
+This program is not a standard cron implementation and is only compatible with part of the standard cron features.  
+
+Based on: https://github.com/robfig/beat (v3)  
 
 ### Features:  
 

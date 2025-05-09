@@ -1,4 +1,4 @@
-package cron
+package beat
 
 import (
 	"context"
@@ -21,7 +21,7 @@ type job struct {
 	Prev     time.Time // 前一次运行的时间
 }
 
-type Cron struct {
+type Beat struct {
 	jobs        []*job          // 任务集合
 	jobWaiter   sync.WaitGroup  // 任务完成等待
 	withRecover bool            // 是否启用recover
@@ -76,8 +76,8 @@ type (
 
 func emptyJobFunc(_ context.Context, _ any) {}
 
-func New(opts ...Option) *Cron {
-	c := &Cron{
+func New(opts ...Option) *Beat {
+	b := &Beat{
 		jobs:     []*job{},
 		parser:   defaultParser,
 		location: time.Local,
@@ -88,30 +88,30 @@ func New(opts ...Option) *Cron {
 	}
 
 	for _, opt := range opts {
-		opt(c)
+		opt(b)
 	}
 
-	return c
+	return b
 }
 
-func (c *Cron) run() {
-	c.log.Info("msg", "started")
-	defer c.log.Info("msg", "stopped")
+func (b *Beat) run() {
+	b.log.Info("msg", "started")
+	defer b.log.Info("msg", "stopped")
 
-	now := c.now()
+	now := b.now()
 
 	// 获取一次所有任务的下一次有效时间
-	for _, job := range c.jobs {
+	for _, job := range b.jobs {
 		job.Next = job.Schedule.Next(now)
-		c.log.Info("job.action", "schedule", "job.id", job.Id, "job.next", job.Next.Format(time.RFC3339))
+		b.log.Info("job.action", "schedule", "job.id", job.Id, "job.next", job.Next.Format(time.RFC3339))
 	}
 
 	for {
 		// 对任务的下一次执行时间进行排序，
-		sort.Sort(jobByTime(c.jobs))
+		sort.Sort(jobByTime(b.jobs))
 
 		var timer *time.Timer
-		if len(c.jobs) == 0 || c.jobs[0].Next.IsZero() {
+		if len(b.jobs) == 0 || b.jobs[0].Next.IsZero() {
 			// 没有任务或者时间太长，则休眠，依然可以处理添加或者停止请求
 			//
 			// 目前 parser 的最长时间为 2 年，防止休眠时间过长错过 2 年后
@@ -119,62 +119,62 @@ func (c *Cron) run() {
 			timer = time.NewTimer(8760 * time.Hour)
 		} else {
 			// 获取最近执行时间的定时
-			timer = time.NewTimer(c.jobs[0].Next.Sub(now))
+			timer = time.NewTimer(b.jobs[0].Next.Sub(now))
 		}
 
 		for {
 			select {
 			case now = <-timer.C:
-				now = now.In(c.location)
-				c.log.Debug("job.action", "wake")
+				now = now.In(b.location)
+				b.log.Debug("job.action", "wake")
 
 				// 执行所有已经到定时的任务
-				for _, job := range c.jobs {
+				for _, job := range b.jobs {
 					if job.Next.After(now) || job.Next.IsZero() {
 						break
 					}
-					c.log.Debug("job.action", "execute", "job.id", job.Id)
+					b.log.Debug("job.action", "execute", "job.id", job.Id)
 					// 是否使用带 recover 的执行方式
-					if c.withRecover {
-						c.executeJobWithRecover(job)
+					if b.withRecover {
+						b.executeJobWithRecover(job)
 					} else {
-						c.executeJob(job)
+						b.executeJob(job)
 					}
 					job.Prev = job.Next
 					job.Next = job.Schedule.Next(now)
 				}
 
-			case op := <-c.operate:
+			case op := <-b.operate:
 				timer.Stop()
-				now = c.now()
+				now = b.now()
 
 				switch arg := op.(type) {
 				case opAdd:
 					newJob := (*job)(arg)
 
 					newJob.Next = newJob.Schedule.Next(now)
-					c.addJob(newJob)
+					b.addJob(newJob)
 
-					c.log.Info("job.action", "add", "job.id", newJob.Id, "job.next", newJob.Next.Format(time.RFC3339))
+					b.log.Info("job.action", "add", "job.id", newJob.Id, "job.next", newJob.Next.Format(time.RFC3339))
 
 				case opRemove:
 					id := string(arg)
 
-					c.removeJob(id)
+					b.removeJob(id)
 
-					c.log.Info("job.action", "remove", "job.id", id)
+					b.log.Info("job.action", "remove", "job.id", id)
 
 				case opRemoveAll:
-					c.removeAllJob()
+					b.removeAllJob()
 
-					c.log.Info("job.action", "remove-all")
+					b.log.Info("job.action", "remove-all")
 
 				case opRemoveByPattern:
 					pattern := (*regexp.Regexp)(arg)
 
-					c.removeJobByPattern(pattern)
+					b.removeJobByPattern(pattern)
 
-					c.log.Info("job.action", "remove-by-pattern", "job.pattern", pattern.String())
+					b.log.Info("job.action", "remove-by-pattern", "job.pattern", pattern.String())
 
 				case opStop:
 					return
@@ -186,89 +186,89 @@ func (c *Cron) run() {
 	}
 }
 
-// 返回 c.location 的当前时间
-func (c *Cron) now() time.Time {
-	return time.Now().In(c.location)
+// 返回 b.location 的当前时间
+func (b *Beat) now() time.Time {
+	return time.Now().In(b.location)
 }
 
 // 开始执行任务，任务将在协程中执行
 //
 // ? 如果任务量大，可能会出现协程数量限制，后续考虑优化
-func (c *Cron) executeJob(job *job) {
-	c.jobWaiter.Add(1)
+func (b *Beat) executeJob(job *job) {
+	b.jobWaiter.Add(1)
 	go func() {
-		defer c.jobWaiter.Done()
-		job.Func(c.ctx, job.Userdata)
+		defer b.jobWaiter.Done()
+		job.Func(b.ctx, job.Userdata)
 	}()
 }
 
 // 开始执行任务，任务将在协程中执行，如果出现 panic，将会恢复
 //
 // ? 如果任务量大，可能会出现协程数量限制，后续考虑优化
-func (c *Cron) executeJobWithRecover(job *job) {
-	c.jobWaiter.Add(1)
+func (b *Beat) executeJobWithRecover(job *job) {
+	b.jobWaiter.Add(1)
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
 				buf := make([]byte, 64<<10)
 				n := runtime.Stack(buf, false)
 				buf = buf[:n]
-				c.log.Error("panic", r, "statck", buf)
+				b.log.Error("panic", r, "statck", buf)
 			}
 		}()
 
-		defer c.jobWaiter.Done()
-		job.Func(c.ctx, job.Userdata)
+		defer b.jobWaiter.Done()
+		job.Func(b.ctx, job.Userdata)
 	}()
 }
 
-func (c *Cron) addJob(job *job) {
-	found := c.find(job.Id)
+func (b *Beat) addJob(job *job) {
+	found := b.find(job.Id)
 	if found != nil {
-		c.log.Warn("msg", "job already exists, overwrite the old one", "job.id", found.Id)
-		c.removeJob(found.Id)
+		b.log.Warn("msg", "job already exists, overwrite the old one", "job.id", found.Id)
+		b.removeJob(found.Id)
 	}
 
-	c.jobs = append(c.jobs, job)
+	b.jobs = append(b.jobs, job)
 }
 
 // 移除任务
 //
 // 返回移除的任务对象，不存在则返回 nil
-func (c *Cron) removeJob(id string) {
+func (b *Beat) removeJob(id string) {
 	jobs := make([]*job, 0)
 
-	for _, job := range c.jobs {
+	for _, job := range b.jobs {
 		if job.Id != id {
 			jobs = append(jobs, job)
 		}
 	}
-	c.jobs = jobs
+	b.jobs = jobs
 }
 
 // 移除全部任务
-func (c *Cron) removeAllJob() {
-	c.jobs = make([]*job, 0)
+func (b *Beat) removeAllJob() {
+	b.jobs = make([]*job, 0)
 }
 
 // 通过ID前缀移除任务，所有任务ID含有指定前缀的任务都将移除
-func (c *Cron) removeJobByPattern(pattern *regexp.Regexp) {
+func (b *Beat) removeJobByPattern(pattern *regexp.Regexp) {
 	jobs := make([]*job, 0)
 
-	for _, job := range c.jobs {
+	for _, job := range b.jobs {
 		if !pattern.MatchString(job.Id) {
 			jobs = append(jobs, job)
 		}
 	}
 
-	c.jobs = jobs
+	b.jobs = jobs
 }
 
 // 通过 ID 查找任务
 //
 // 返回查找到的任务对象，不存在则返回 nil
-func (c *Cron) find(id string) *job {
-	for _, job := range c.jobs {
+func (b *Beat) find(id string) *job {
+	for _, job := range b.jobs {
 		if job.Id == id {
 			return job
 		}
@@ -285,14 +285,14 @@ func (c *Cron) find(id string) *job {
 //	id: 任务ID，每个任务ID唯一
 //	fn: 任务执行回调
 //	userdata: 用于保存用户数据，回调时将传递该数据
-func (c *Cron) Add(expr string, id string, fn JobFunc, userdata any) error {
-	sched, err := c.parser.Parse(expr)
+func (b *Beat) Add(expr string, id string, fn JobFunc, userdata any) error {
+	sched, err := b.parser.Parse(expr)
 	if err != nil {
 		return err
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	b.lock.Lock()
+	defer b.lock.Unlock()
 
 	job := &job{
 		Id:       id,
@@ -304,108 +304,108 @@ func (c *Cron) Add(expr string, id string, fn JobFunc, userdata any) error {
 		job.Func = emptyJobFunc
 	}
 
-	if !c.running {
-		c.addJob(job)
+	if !b.running {
+		b.addJob(job)
 	} else {
-		c.operate <- opAdd(job)
+		b.operate <- opAdd(job)
 	}
 
 	return nil
 }
 
 // 移除任务
-func (c *Cron) Remove(id string) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+func (b *Beat) Remove(id string) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 
-	if !c.running {
-		c.removeJob(id)
+	if !b.running {
+		b.removeJob(id)
 	} else {
-		c.operate <- opRemove(id)
+		b.operate <- opRemove(id)
 	}
 }
 
 // 清空任务
-func (c *Cron) RemoveAll() {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+func (b *Beat) RemoveAll() {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 
-	if !c.running {
-		c.removeAllJob()
+	if !b.running {
+		b.removeAllJob()
 	} else {
-		c.operate <- opRemoveAll(struct{}{})
+		b.operate <- opRemoveAll(struct{}{})
 	}
 }
 
 // 通过正则表达式移除任务
-func (c *Cron) RemoveByPattern(exp string) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+func (b *Beat) RemoveByPattern(exp string) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 
 	pattern, err := regexp.Compile(exp)
 	if err != nil {
 		return err
 	}
 
-	if !c.running {
-		c.removeJobByPattern(pattern)
+	if !b.running {
+		b.removeJobByPattern(pattern)
 	} else {
-		c.operate <- opRemoveByPattern(pattern)
+		b.operate <- opRemoveByPattern(pattern)
 	}
 
 	return nil
 }
 
 // 停止运行
-func (c *Cron) Stop() {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+func (b *Beat) Stop() {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 
-	if c.running {
-		c.operate <- opStop(struct{}{})
-		c.running = false
+	if b.running {
+		b.operate <- opStop(struct{}{})
+		b.running = false
 	}
-	c.jobWaiter.Wait()
+	b.jobWaiter.Wait()
 }
 
-// 开始运行，cron 将在协程中运行
-func (c *Cron) Start() {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+// 开始运行，beat 将在协程中运行
+func (b *Beat) Start() {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 
-	if c.running {
+	if b.running {
 		return
 	}
 
-	c.running = true
-	go c.run()
+	b.running = true
+	go b.run()
 }
 
-// 开始运行，cron 将阻塞运行
-func (c *Cron) Run() {
-	c.lock.Lock()
+// 开始运行，beat 将阻塞运行
+func (b *Beat) Run() {
+	b.lock.Lock()
 
-	if c.running {
-		c.lock.Unlock()
+	if b.running {
+		b.lock.Unlock()
 		return
 	}
 
-	c.running = true
-	c.lock.Unlock()
-	c.run()
+	b.running = true
+	b.lock.Unlock()
+	b.run()
 }
 
 // 获取运行状态
-func (c *Cron) IsRunning() bool {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+func (b *Beat) IsRunning() bool {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 
-	return c.running
+	return b.running
 }
 
-func (c *Cron) SetLogger(log Logger) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+func (b *Beat) SetLogger(log Logger) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 
-	c.log = log
+	b.log = log
 }

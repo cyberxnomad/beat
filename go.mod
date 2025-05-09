@@ -1,3 +1,3 @@
-module github.com/cyberxnomad/cron
+module github.com/cyberxnomad/beat
 
 go 1.23

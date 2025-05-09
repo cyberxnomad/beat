@@ -9,7 +9,7 @@ Beat 是一个类似 cron 的定时库。
 
 此程序并非标准的 cron 实现，仅兼容部分标准 cron 特性。  
 
-基于项目：https://github.com/robfig/beat (v3)  
+基于项目：https://github.com/robfig/cron (v3)  
 
 ### 功能：  
 

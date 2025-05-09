@@ -10,7 +10,7 @@ Beat is a scheduling library similar to cron.
 
 This program is not a standard cron implementation and is only compatible with part of the standard cron features.  
 
-Based on: https://github.com/robfig/beat (v3)  
+Based on: https://github.com/robfig/cron (v3)  
 
 ### Features:  
 

@@ -22,15 +22,15 @@ type job struct {
 }
 
 type Beat struct {
-	jobs        []*job          // 任务集合
-	jobWaiter   sync.WaitGroup  // 任务完成等待
-	withRecover bool            // 是否启用recover
-	lock        sync.Mutex      // 互斥锁
-	running     bool            // 是否运行
-	parser      ScheduleParser  // 解析器
-	location    *time.Location  // 时区
-	ctx         context.Context // 上下文
-	log         Logger          // log
+	jobs         []*job          // 任务集合
+	jobWaiter    sync.WaitGroup  // 任务完成等待
+	withRecovery bool            // 是否启用recover
+	lock         sync.Mutex      // 互斥锁
+	running      bool            // 是否运行
+	parser       ScheduleParser  // 解析器
+	location     *time.Location  // 时区
+	ctx          context.Context // 上下文
+	log          Logger          // log
 
 	operate chan any
 }
@@ -134,12 +134,8 @@ func (b *Beat) run() {
 						break
 					}
 					b.log.Debug("job.action", "execute", "job.id", job.Id)
-					// 是否使用带 recover 的执行方式
-					if b.withRecover {
-						b.executeJobWithRecover(job)
-					} else {
-						b.executeJob(job)
-					}
+					b.executeJob(job)
+
 					job.Prev = job.Next
 					job.Next = job.Schedule.Next(now)
 				}
@@ -191,35 +187,26 @@ func (b *Beat) now() time.Time {
 	return time.Now().In(b.location)
 }
 
-// 开始执行任务，任务将在协程中执行
+// 开始执行任务，任务将在协程中执行，如果出现 panic，将会恢复
 //
 // ? 如果任务量大，可能会出现协程数量限制，后续考虑优化
 func (b *Beat) executeJob(job *job) {
 	b.jobWaiter.Add(1)
-	go func() {
-		defer b.jobWaiter.Done()
-		job.Func(b.ctx, job.Userdata)
-	}()
-}
-
-// 开始执行任务，任务将在协程中执行，如果出现 panic，将会恢复
-//
-// ? 如果任务量大，可能会出现协程数量限制，后续考虑优化
-func (b *Beat) executeJobWithRecover(job *job) {
-	b.jobWaiter.Add(1)
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				buf := make([]byte, 64<<10)
-				n := runtime.Stack(buf, false)
-				buf = buf[:n]
-				b.log.Error("panic", r, "statck", buf)
-			}
-		}()
+	go func(withRecovery bool) {
+		if withRecovery {
+			defer func() {
+				if r := recover(); r != nil {
+					buf := make([]byte, 64<<10)
+					n := runtime.Stack(buf, false)
+					buf = buf[:n]
+					b.log.Error("panic", r, "statck", string(buf))
+				}
+			}()
+		}
 
 		defer b.jobWaiter.Done()
 		job.Func(b.ctx, job.Userdata)
-	}()
+	}(b.withRecovery)
 }
 
 func (b *Beat) addJob(job *job) {

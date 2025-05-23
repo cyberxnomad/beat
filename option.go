@@ -15,9 +15,9 @@ func WithParser(p ScheduleParser) option {
 }
 
 // WithRecover allows to enable panic recovery in job.
-func WithRecover(enable bool) option {
+func WithRecovery() option {
 	return func(b *Beat) {
-		b.withRecover = enable
+		b.withRecovery = true
 	}
 }
 

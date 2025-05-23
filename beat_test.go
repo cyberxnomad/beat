@@ -401,3 +401,21 @@ func TestParserWithNonLocalTimezone(t *testing.T) {
 	case <-wait(wg):
 	}
 }
+
+func TestRecovery(t *testing.T) {
+	beat := New(WithRecovery())
+
+	now := time.Now().Add(2 * time.Second)
+	expr := fmt.Sprintf("%d %d %d %d %d %d %d",
+		now.Year(), now.Month(), now.Day(), now.Weekday(),
+		now.Hour(), now.Minute(), now.Second())
+
+	beat.Add(expr, "TestRecovery", func(ctx context.Context, userdata any) {
+		panic("panic in beat")
+	}, nil)
+
+	beat.Start()
+	defer beat.Stop()
+
+	time.Sleep(3 * time.Second)
+}

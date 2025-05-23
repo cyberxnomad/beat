@@ -41,3 +41,15 @@ func WithContext(ctx context.Context) option {
 		b.ctx = ctx
 	}
 }
+
+// WithMaxGoroutines allows to specify max number of goroutines.
+//
+// Default is 0. 0 means no limit
+func WithMaxGoroutines(max int) option {
+	return func(b *Beat) {
+		if max < 0 {
+			max = 0
+		}
+		b.maxGoroutines = max
+	}
+}

@@ -419,3 +419,35 @@ func TestRecovery(t *testing.T) {
 
 	time.Sleep(3 * time.Second)
 }
+
+func TestMaxGoroutines(t *testing.T) {
+	wg := &sync.WaitGroup{}
+	wg.Add(3)
+
+	beat := New(WithMaxGoroutines(2))
+
+	now := time.Now().Add(1 * time.Second)
+	expr := fmt.Sprintf("%d %d %d %d %d %d %d",
+		now.Year(), now.Month(), now.Day(), now.Weekday(),
+		now.Hour(), now.Minute(), now.Second())
+
+	fn := func(ctx context.Context, userdata any) {
+		time.Sleep(time.Second)
+		wg.Done()
+	}
+
+	beat.Add(expr, "TestMaxGoroutines-1", fn, nil)
+	beat.Add(expr, "TestMaxGoroutines-2", fn, nil)
+	beat.Add(expr, "TestMaxGoroutines-3", fn, nil)
+
+	beat.Start()
+	defer beat.Stop()
+
+	// Give beat 2 seconds to run our job (which is always activated).
+	select {
+	case <-time.After(OneSecond * 2):
+
+	case <-wait(wg):
+		t.Fatal("expected 2 jobs to run")
+	}
+}

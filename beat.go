@@ -7,6 +7,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"golang.org/x/sync/semaphore"
 )
 
 type JobFunc func(ctx context.Context, userdata any)
@@ -22,15 +24,17 @@ type job struct {
 }
 
 type Beat struct {
-	jobs         []*job          // 任务集合
-	jobWaiter    sync.WaitGroup  // 任务完成等待
-	withRecovery bool            // 是否启用recover
-	lock         sync.Mutex      // 互斥锁
-	running      bool            // 是否运行
-	parser       ScheduleParser  // 解析器
-	location     *time.Location  // 时区
-	ctx          context.Context // 上下文
-	log          Logger          // log
+	jobs          []*job              // 任务集合
+	jobWaiter     sync.WaitGroup      // 任务完成等待
+	withRecovery  bool                // 是否启用recover
+	lock          sync.Mutex          // 互斥锁
+	maxGoroutines int                 // 最大协程数量
+	sem           *semaphore.Weighted //
+	running       bool                // 是否运行
+	parser        ScheduleParser      // 解析器
+	location      *time.Location      // 时区
+	ctx           context.Context     // 上下文
+	log           Logger              // log
 
 	operate chan any
 }
@@ -89,6 +93,10 @@ func New(opts ...option) *Beat {
 
 	for _, opt := range opts {
 		opt(b)
+	}
+
+	if b.maxGoroutines > 0 {
+		b.sem = semaphore.NewWeighted(int64(b.maxGoroutines))
 	}
 
 	return b
@@ -187,13 +195,16 @@ func (b *Beat) now() time.Time {
 	return time.Now().In(b.location)
 }
 
-// 开始执行任务，任务将在协程中执行，如果出现 panic，将会恢复
-//
-// ? 如果任务量大，可能会出现协程数量限制，后续考虑优化
+// 开始执行任务，任务将在协程中执行
 func (b *Beat) executeJob(job *job) {
+	if b.sem != nil {
+		b.sem.Acquire(b.ctx, 1)
+	}
+
 	b.jobWaiter.Add(1)
-	go func(withRecovery bool) {
-		if withRecovery {
+
+	go func() {
+		if b.withRecovery {
 			defer func() {
 				if r := recover(); r != nil {
 					buf := make([]byte, 64<<10)
@@ -205,8 +216,13 @@ func (b *Beat) executeJob(job *job) {
 		}
 
 		defer b.jobWaiter.Done()
+
+		if b.sem != nil {
+			defer b.sem.Release(1)
+		}
+
 		job.Func(b.ctx, job.Userdata)
-	}(b.withRecovery)
+	}()
 }
 
 func (b *Beat) addJob(job *job) {

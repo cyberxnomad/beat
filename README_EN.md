@@ -23,7 +23,7 @@ Based on: https://github.com/robfig/cron (v3)
   
 - Months in expressions are numeric only, not in the form `Jan`, `Feb`, etc. Weeks are numeric only, not in the form `Mon`, `Tue`, etc.  
 
-- Expressions do not support time zones currently.  
+- ~~Expressions do not support time zones currently.~~  
 
 - Expressions like `@monthly`, `@weekly`, etc. are not supported.  
 
@@ -33,4 +33,5 @@ Based on: https://github.com/robfig/cron (v3)
 
 - [x] custom logger support  
 - [x] Expressions support time zones  
+      e.g. `TZ=Asia/Shanghai * * * * * * *`
 - [ ] support for querying the current job  

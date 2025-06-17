@@ -53,7 +53,7 @@ func NewParser(opts ...parserOption) *Parser {
 }
 
 // 获取域的限制范围
-func (f LayoutField) bounds() (min, max int) {
+func (f LayoutField) Bounds() (min, max int) {
 	switch f {
 	case Year:
 		min = 1970
@@ -151,7 +151,7 @@ func (p *Parser) Parse(exp string) (Schedule, error) {
 // 支持符号：, - * /
 func parseField(field string, lf LayoutField) ([2]uint64, error) {
 	ranges := strings.Split(field, ",")
-	min, max := lf.bounds()
+	min, max := lf.Bounds()
 
 	bits := [2]uint64{}
 	err := error(nil)

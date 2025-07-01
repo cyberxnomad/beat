@@ -13,8 +13,8 @@ Beat 是一个类似 cron 的定时库。
 
 ### 功能：  
 
-- 支持年、秒
-  - 默认时间表达式：`[year] [month] [day] [weekday] [hour] [minute] [second]`  
+- 支持秒
+  - 默认时间表达式：`[month] [day] [weekday] [hour] [minute] [second]`  
   - 可通过 parser 中的 layout 参数来支持自定义时间表达式  
 
 - 允许的符号：`,`(多个时间), `-`(范围), `/`(步长), `*`(通配)  
@@ -32,5 +32,5 @@ Beat 是一个类似 cron 的定时库。
 
 - [x] 支持自定义 logger  
 - [x] 表达式支持时区  
-      例: `TZ=Asia/Shanghai * * * * * * *`
+      例: `TZ=Asia/Shanghai * * * * * *`
 - [ ] 支持查询当前任务  

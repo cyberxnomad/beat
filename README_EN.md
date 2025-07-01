@@ -14,8 +14,8 @@ Based on: https://github.com/robfig/cron (v3)
 
 ### Features:  
 
-- Support year and second
-  - Default time expression: `[year] [month] [day] [weekday] [hour] [minute] [second]`  
+- Support second
+  - Default time expression: `[month] [day] [weekday] [hour] [minute] [second]`  
   - Customized time expressions can be supported via the layout parameter in the parser.  
 
 - Allowed symbols: `,`, `-`, `/`, `*`.  
@@ -33,5 +33,5 @@ Based on: https://github.com/robfig/cron (v3)
 
 - [x] custom logger support  
 - [x] Expressions support time zones  
-      e.g. `TZ=Asia/Shanghai * * * * * * *`
+      e.g. `TZ=Asia/Shanghai * * * * * *`
 - [ ] support for querying the current job  

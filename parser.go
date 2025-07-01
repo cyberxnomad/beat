@@ -10,8 +10,7 @@ import (
 type LayoutField uint32
 
 const (
-	Year LayoutField = 1 << iota
-	Month
+	Month LayoutField = 1<<iota + 1
 	Dom
 	Dow
 	Hour
@@ -19,7 +18,7 @@ const (
 	Second
 )
 
-var DefaultLayout = []LayoutField{Year, Month, Dom, Dow, Hour, Minute, Second}
+var DefaultLayout = []LayoutField{Month, Dom, Dow, Hour, Minute, Second}
 
 type Parser struct {
 	layout         []LayoutField
@@ -27,13 +26,12 @@ type Parser struct {
 }
 
 type SchedTime struct {
-	Year   [2]uint64 // 年
-	Month  uint64    // 月
-	Dom    uint64    // 日
-	Dow    uint64    // 星期，0=星期日
-	Hour   uint64    // 时
-	Minute uint64    // 分
-	Second uint64    // 秒
+	Month  uint64 // 月
+	Dom    uint64 // 日
+	Dow    uint64 // 星期，0=星期日
+	Hour   uint64 // 时
+	Minute uint64 // 分
+	Second uint64 // 秒
 
 	location *time.Location
 }
@@ -55,10 +53,6 @@ func NewParser(opts ...parserOption) *Parser {
 // 获取域的限制范围
 func (f LayoutField) Bounds() (min, max int) {
 	switch f {
-	case Year:
-		min = 1970
-		max = min + 127
-
 	case Month:
 		min = 1
 		max = 12
@@ -120,26 +114,23 @@ func (p *Parser) Parse(exp string) (Schedule, error) {
 		}
 
 		switch p.layout[i] {
-		case Year:
-			st.Year = bits
-
 		case Month:
-			st.Month = bits[0]
+			st.Month = bits
 
 		case Dom:
-			st.Dom = bits[0]
+			st.Dom = bits
 
 		case Dow:
-			st.Dow = bits[0]
+			st.Dow = bits
 
 		case Hour:
-			st.Hour = bits[0]
+			st.Hour = bits
 
 		case Minute:
-			st.Minute = bits[0]
+			st.Minute = bits
 
 		case Second:
-			st.Second = bits[0]
+			st.Second = bits
 		}
 	}
 
@@ -149,11 +140,11 @@ func (p *Parser) Parse(exp string) (Schedule, error) {
 // 解析域
 //
 // 支持符号：, - * /
-func parseField(field string, lf LayoutField) ([2]uint64, error) {
+func parseField(field string, lf LayoutField) (uint64, error) {
 	ranges := strings.Split(field, ",")
 	min, max := lf.Bounds()
 
-	bits := [2]uint64{}
+	bits := uint64(0)
 	err := error(nil)
 	for _, exp := range ranges {
 		start, end, step := 0, 0, 0
@@ -165,7 +156,7 @@ func parseField(field string, lf LayoutField) ([2]uint64, error) {
 		if lowAndHigh[0] == "*" {
 			if len(lowAndHigh) != 1 {
 				// 不允许出现类似 *-2 的表达式
-				return [2]uint64{}, fmt.Errorf("%w: %s", ErrInvalidExp, exp)
+				return 0, fmt.Errorf("%w: %s", ErrInvalidExp, exp)
 			}
 			// 若为通配符，则起始和结束分别为最小值和最大值
 			start = min
@@ -174,7 +165,7 @@ func parseField(field string, lf LayoutField) ([2]uint64, error) {
 			// 首个字符不是通配符，说明表达式中至少标明了起始值，尝试转换为整型
 			start, err = strconv.Atoi(lowAndHigh[0])
 			if err != nil {
-				return [2]uint64{}, fmt.Errorf("%w: %s", ErrInvalidExp, err)
+				return 0, fmt.Errorf("%w: %s", ErrInvalidExp, err)
 			}
 
 			switch len(lowAndHigh) {
@@ -184,11 +175,11 @@ func parseField(field string, lf LayoutField) ([2]uint64, error) {
 			case 2: // 长度为2，说明表达式中标明了结束值
 				end, err = strconv.Atoi(lowAndHigh[1])
 				if err != nil {
-					return [2]uint64{}, fmt.Errorf("%w: %s", ErrInvalidExp, err)
+					return 0, fmt.Errorf("%w: %s", ErrInvalidExp, err)
 				}
 
 			default: // 语法错误
-				return [2]uint64{}, fmt.Errorf("%w: too many hyphens: %s", ErrInvalidExp, exp)
+				return 0, fmt.Errorf("%w: too many hyphens: %s", ErrInvalidExp, exp)
 			}
 		}
 
@@ -199,10 +190,10 @@ func parseField(field string, lf LayoutField) ([2]uint64, error) {
 		case 2: // 长度为2，则说明表达式中含有步长
 			step, err = strconv.Atoi(rangeAndStep[1])
 			if err != nil {
-				return [2]uint64{}, fmt.Errorf("%w: %s", ErrInvalidExp, err)
+				return 0, fmt.Errorf("%w: %s", ErrInvalidExp, err)
 			}
 			if step <= 0 {
-				return [2]uint64{}, fmt.Errorf("%w: negative or zero step is not allowed", ErrInvalidExp)
+				return 0, fmt.Errorf("%w: negative or zero step is not allowed", ErrInvalidExp)
 			}
 
 			// 表达式中没有标明结束值，则将结束值设为最大值
@@ -210,27 +201,17 @@ func parseField(field string, lf LayoutField) ([2]uint64, error) {
 				end = max
 			}
 		default:
-			return [2]uint64{}, fmt.Errorf("%w: too many slashes: %s", ErrInvalidExp, exp)
+			return 0, fmt.Errorf("%w: too many slashes: %s", ErrInvalidExp, exp)
 		}
 
 		// 判断参数是否超出范围
 		if start < min || end > max || start > end {
-			return [2]uint64{}, fmt.Errorf("%w: out of range: %s", ErrInvalidExp, exp)
-		}
-
-		// 如果当前解析的域为年，则减去1970（以1970为起始年份）
-		if lf == Year {
-			start -= 1970
-			end -= 1970
+			return 0, fmt.Errorf("%w: out of range: %s", ErrInvalidExp, exp)
 		}
 
 		// 为有效位置1
 		for i := start; i <= end; i += step {
-			if i < 64 {
-				bits[0] |= 1 << i
-			} else {
-				bits[1] |= 1 << (i - 64)
-			}
+			bits |= 1 << i
 		}
 	}
 
@@ -256,37 +237,16 @@ func (st *SchedTime) Next(t time.Time) time.Time {
 
 	// 匹配机制未匹配到时，将一直增加时间进行匹配，
 	// 此值用于限制匹配失败的上限
-	yearMax := t.Year() + 2
+	yearLimit := t.Year() + 2
 
-	// 设定用于年份判断的位
-	yearBits := st.Year[0]
-	delta := t.Year() - 1970
-	if delta >= 64 {
-		yearBits = st.Year[1]
-		delta = delta - 64
-	}
-
-	// 防止以下情况的出现：因时间精度问题，10.001 秒的时候进入该方法，
-	// 如果直接进行匹配，则第 10 秒的时间就会忽略
-	t = t.Add(time.Second - time.Duration(t.Nanosecond())*time.Nanosecond)
+	// 对齐到下一秒的开始
+	t = t.Truncate(time.Second).Add(time.Second)
 	added := false
 
 LOOP:
 	// 超过匹配年限则返回零值时间
-	if t.Year() > yearMax {
+	if t.Year() > yearLimit {
 		return time.Time{}
-	}
-
-	for (1<<delta)&yearBits == 0 {
-		if !added {
-			added = true
-			t = time.Date(t.Year(), time.January, 1, 0, 0, 0, 0, loc)
-		}
-		t = t.AddDate(1, 0, 0)
-
-		if t.Year() > yearMax {
-			return time.Time{}
-		}
 	}
 
 	for (1<<t.Month())&st.Month == 0 {

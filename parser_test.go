@@ -13,14 +13,14 @@ func TestActivation(t *testing.T) {
 		expected bool
 	}{
 		// Every 15 seconds.
-		{"2012-07-09T15:00:00+08:00", "* * * * * * 0/15", true},
-		{"2012-07-09T15:00:45+08:00", "* * * * * * 0/15", true},
-		{"2012-07-09T15:00:40+08:00", "* * * * * * 0/15", false},
+		{"2012-07-09T15:00:00+08:00", "* * * * * 0/15", true},
+		{"2012-07-09T15:00:45+08:00", "* * * * * 0/15", true},
+		{"2012-07-09T15:00:40+08:00", "* * * * * 0/15", false},
 
 		// Every 15 seconds, starting at 5 seconds.
-		{"2012-07-09T15:00:05+08:00", "* * * * * * 5/15", true},
-		{"2012-07-09T15:00:20+08:00", "* * * * * * 5/15", true},
-		{"2012-07-09T15:00:50+08:00", "* * * * * * 5/15", true},
+		{"2012-07-09T15:00:05+08:00", "* * * * * 5/15", true},
+		{"2012-07-09T15:00:20+08:00", "* * * * * 5/15", true},
+		{"2012-07-09T15:00:50+08:00", "* * * * * 5/15", true},
 
 		// Test interaction of DOW and DOM.
 		// If both are restricted, then only one needs to match.
@@ -30,10 +30,10 @@ func TestActivation(t *testing.T) {
 		// {"2012-07-15T00:00:00+08:00", "* * */10 0 * * *", true},
 
 		// However, if one has a star, then both need to match.
-		{"2012-07-15T00:00:00+08:00", "* * * 0 * * *", true},
-		{"2012-07-09T00:00:00+08:00", "* * 1,15 * * * *", false},
-		{"2012-07-15T00:00:00+08:00", "* * 1,15 * * * *", true},
-		{"2012-07-15T00:00:00+08:00", "* * */2 0 * * *", true},
+		{"2012-07-15T00:00:00+08:00", "* * 0 * * *", true},
+		{"2012-07-09T00:00:00+08:00", "* 1,15 * * * *", false},
+		{"2012-07-15T00:00:00+08:00", "* 1,15 * * * *", true},
+		{"2012-07-15T00:00:00+08:00", "* */2 0 * * *", true},
 	}
 
 	for _, test := range tests {
@@ -45,7 +45,7 @@ func TestActivation(t *testing.T) {
 		actual := sched.Next(parseTime(test.time).Add(-1 * time.Second))
 		// expected := getTime(test.time)
 		expected := parseTime(test.time)
-		if test.expected && expected != actual || !test.expected && expected == actual {
+		if test.expected && expected != actual || !test.expected && expected.Equal(actual) {
 			t.Errorf("Fail evaluating %s on %s: (expected) %s != %s (actual)",
 				test.spec, test.time, expected, actual)
 		}
@@ -67,7 +67,7 @@ func parseTime(value string) time.Time {
 func TestDomAndDow(t *testing.T) {
 	start := "2024-11-06T00:00:00+08:00"
 
-	expr1 := "* * */2 3 0 0 0"
+	expr1 := "* */2 3 0 0 0"
 	expectSet1 := []string{
 		"2024-11-13T00:00:00+08:00",
 		"2024-11-27T00:00:00+08:00",
@@ -93,7 +93,7 @@ func TestDomAndDow(t *testing.T) {
 		next = actual
 	}
 
-	expr2 := "* * * 3 0 0 0"
+	expr2 := "* * 3 0 0 0"
 	expectSet2 := []string{
 		"2024-11-13T00:00:00+08:00",
 		"2024-11-20T00:00:00+08:00",
@@ -134,26 +134,26 @@ func TestParserTimeZone(t *testing.T) {
 		expected bool
 	}{
 		{
-			fmt.Sprintf("%d %d %d %d %d %d %d",
-				expect.Year(), expect.Month(), expect.Day(), expect.Weekday(),
+			fmt.Sprintf("%d %d %d %d %d %d",
+				expect.Month(), expect.Day(), expect.Weekday(),
 				expect.Hour(), expect.Minute(), expect.Second()),
 			true,
 		},
 		{
-			fmt.Sprintf("TZ=Asia/Shanghai %d %d %d %d %d %d %d",
-				expect.In(shanghaiLoc).Year(), expect.In(shanghaiLoc).Month(), expect.In(shanghaiLoc).Day(), expect.In(shanghaiLoc).Weekday(),
+			fmt.Sprintf("TZ=Asia/Shanghai %d %d %d %d %d %d",
+				expect.In(shanghaiLoc).Month(), expect.In(shanghaiLoc).Day(), expect.In(shanghaiLoc).Weekday(),
 				expect.In(shanghaiLoc).Hour(), expect.In(shanghaiLoc).Minute(), expect.In(shanghaiLoc).Second()),
 			true,
 		},
 		{
-			fmt.Sprintf("TZ=Asia/Shanghai %d %d %d %d %d %d %d",
-				expect.Year(), expect.Month(), expect.Day(), expect.Weekday(),
+			fmt.Sprintf("TZ=Asia/Shanghai %d %d %d %d %d %d",
+				expect.Month(), expect.Day(), expect.Weekday(),
 				expect.Hour(), expect.Minute(), expect.Second()),
 			false,
 		},
 		{
-			fmt.Sprintf("TZ=Asia/Tokyo %d %d %d %d %d %d %d",
-				expect.In(shanghaiLoc).Year(), expect.In(shanghaiLoc).Month(), expect.In(shanghaiLoc).Day(), expect.In(shanghaiLoc).Weekday(),
+			fmt.Sprintf("TZ=Asia/Tokyo %d %d %d %d %d %d",
+				expect.In(shanghaiLoc).Month(), expect.In(shanghaiLoc).Day(), expect.In(shanghaiLoc).Weekday(),
 				expect.In(shanghaiLoc).Hour(), expect.In(shanghaiLoc).Minute(), expect.In(shanghaiLoc).Second()),
 			false,
 		},
@@ -167,7 +167,7 @@ func TestParserTimeZone(t *testing.T) {
 		}
 		actual := sched.Next(now)
 
-		if (test.expected && expect != actual) || (!test.expected && expect == actual) {
+		if (test.expected && expect != actual) || (!test.expected && expect.Equal(actual)) {
 			t.Errorf("Fail evaluating %s on %s: (expected) %s != %s (actual)",
 				test.spec, expect, expect, actual)
 		}

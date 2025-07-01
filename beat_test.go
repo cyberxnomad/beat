@@ -52,7 +52,7 @@ func TestStopCausesJobsToNotRun(t *testing.T) {
 	beat := New()
 	beat.Start()
 	beat.Stop()
-	beat.Add("* * * * * * *", "TestStopCausesJobsToNotRun-1",
+	beat.Add("* * * * * *", "TestStopCausesJobsToNotRun-1",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
@@ -70,7 +70,7 @@ func TestAddBeforeRunning(t *testing.T) {
 	wg.Add(1)
 
 	beat := New()
-	beat.Add("* * * * * * *", "TestAddBeforeRunning-1",
+	beat.Add("* * * * * *", "TestAddBeforeRunning-1",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 	beat.Start()
@@ -92,7 +92,7 @@ func TestAddWhileRunning(t *testing.T) {
 	beat := New()
 	beat.Start()
 	defer beat.Stop()
-	beat.Add("* * * * * * *", "TestAddWhileRunning-1",
+	beat.Add("* * * * * *", "TestAddWhileRunning-1",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
@@ -113,7 +113,7 @@ func TestAddWhileRunningWithDelay(t *testing.T) {
 
 	var calls int64
 
-	beat.Add("* * * * * * *", "TestAddWhileRunningWithDelay-1",
+	beat.Add("* * * * * *", "TestAddWhileRunningWithDelay-1",
 		func(ctx context.Context, userdata any) { atomic.AddInt64(&calls, 1) },
 		nil)
 
@@ -131,7 +131,7 @@ func TestRemoveBeforeRunning(t *testing.T) {
 
 	beat := New()
 
-	beat.Add("* * * * * * *", id,
+	beat.Add("* * * * * *", id,
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 	beat.Remove(id)
@@ -155,7 +155,7 @@ func TestRemoveWhileRunning(t *testing.T) {
 	beat := New()
 	beat.Start()
 	defer beat.Stop()
-	beat.Add("* * * * * * *", id,
+	beat.Add("* * * * * *", id,
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 	beat.Remove(id)
@@ -176,7 +176,7 @@ func TestRemoveByPattern(t *testing.T) {
 	beat := New()
 	beat.Start()
 	defer beat.Stop()
-	beat.Add("* * * * * * *", id,
+	beat.Add("* * * * * *", id,
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
@@ -201,28 +201,28 @@ func TestMultipleJobs(t *testing.T) {
 	wg.Add(2)
 
 	beat := New()
-	beat.Add("* 1 1 * 0 0 0", "TestMultipleJobs-1",
+	beat.Add("1 1 * 0 0 0", "TestMultipleJobs-1",
 		func(ctx context.Context, userdata any) {},
 		nil)
 
-	beat.Add("* * * * * * *", "TestMultipleJobs-2",
+	beat.Add("* * * * * *", "TestMultipleJobs-2",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
-	beat.Add("* * * * * * *", "TestMultipleJobs-3",
+	beat.Add("* * * * * *", "TestMultipleJobs-3",
 		func(ctx context.Context, userdata any) { t.Fatal() },
 		nil)
 
-	beat.Add("* * * * * * *", "TestMultipleJobs-4",
+	beat.Add("* * * * * *", "TestMultipleJobs-4",
 		func(ctx context.Context, userdata any) { t.Fatal() },
 		nil)
 
-	beat.Add("* 12 31 * 0 0 0",
+	beat.Add("12 31 * 0 0 0",
 		"TestMultipleJobs-5",
 		func(ctx context.Context, userdata any) {},
 		nil)
 
-	beat.Add("* * * * * * *", "TestMultipleJobs-6",
+	beat.Add("* * * * * *", "TestMultipleJobs-6",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
@@ -244,15 +244,15 @@ func TestRunningJobTwice(t *testing.T) {
 	wg.Add(2)
 
 	beat := New()
-	beat.Add("* 1 1 * 0 0 0", "TestRunningJobTwice-1",
+	beat.Add("1 1 * 0 0 0", "TestRunningJobTwice-1",
 		func(ctx context.Context, userdata any) {},
 		nil)
 
-	beat.Add("* 12 31 * 0 0 0", "TestRunningJobTwice-2",
+	beat.Add("12 31 * 0 0 0", "TestRunningJobTwice-2",
 		func(ctx context.Context, userdata any) {},
 		nil)
 
-	beat.Add("* * * * * * *", "TestRunningJobTwice-3",
+	beat.Add("* * * * * *", "TestRunningJobTwice-3",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
 
@@ -272,7 +272,7 @@ func TestStartNoop(t *testing.T) {
 
 	beat := New()
 
-	beat.Add("* * * * * * *", "TestStartNoop-1",
+	beat.Add("* * * * * *", "TestStartNoop-1",
 		func(ctx context.Context, userdata any) { userdata.(chan struct{}) <- struct{}{} },
 		tickChan)
 
@@ -306,7 +306,7 @@ func TestLocalTimezone(t *testing.T) {
 		tm = time.Now()
 	}
 
-	expr := fmt.Sprintf("%d %d %d %d %d %d %d,%d", tm.Year(), tm.Month(), tm.Day(), tm.Weekday(), tm.Hour(), tm.Minute(), tm.Second()+1, tm.Second()+2)
+	expr := fmt.Sprintf("%d %d %d %d %d %d,%d", tm.Month(), tm.Day(), tm.Weekday(), tm.Hour(), tm.Minute(), tm.Second()+1, tm.Second()+2)
 	beat.Add(expr, "TestLocalTimezone-1",
 		func(ctx context.Context, userdata any) { wg.Done() },
 		nil)
@@ -341,8 +341,8 @@ func TestNonLocalTimezone(t *testing.T) {
 		tm = time.Now().In(loc)
 	}
 
-	expr := fmt.Sprintf("%d %d %d %d %d %d %d,%d",
-		tm.Year(), tm.Month(), tm.Day(), tm.Weekday(),
+	expr := fmt.Sprintf("%d %d %d %d %d %d,%d",
+		tm.Month(), tm.Day(), tm.Weekday(),
 		tm.Hour(), tm.Minute(), tm.Second()+1, tm.Second()+2)
 
 	beat.Add(expr, "TestNonLocalTimezone-1",
@@ -383,8 +383,8 @@ func TestParserWithNonLocalTimezone(t *testing.T) {
 		tm = time.Now().In(loc)
 	}
 
-	expr := fmt.Sprintf("%d %d %d %d %d %d %d,%d",
-		tm.Year(), tm.Month(), tm.Day(), tm.Weekday(),
+	expr := fmt.Sprintf("%d %d %d %d %d %d,%d",
+		tm.Month(), tm.Day(), tm.Weekday(),
 		tm.Hour(), tm.Minute(), tm.Second()+1, tm.Second()+2)
 
 	beat.Add(expr, "TestParserWithNonLocalTimezone-1",
@@ -406,8 +406,8 @@ func TestRecovery(t *testing.T) {
 	beat := New(WithRecovery())
 
 	now := time.Now().Add(2 * time.Second)
-	expr := fmt.Sprintf("%d %d %d %d %d %d %d",
-		now.Year(), now.Month(), now.Day(), now.Weekday(),
+	expr := fmt.Sprintf("%d %d %d %d %d %d",
+		now.Month(), now.Day(), now.Weekday(),
 		now.Hour(), now.Minute(), now.Second())
 
 	beat.Add(expr, "TestRecovery", func(ctx context.Context, userdata any) {
@@ -427,8 +427,8 @@ func TestMaxGoroutines(t *testing.T) {
 	beat := New(WithMaxGoroutines(2))
 
 	now := time.Now().Add(1 * time.Second)
-	expr := fmt.Sprintf("%d %d %d %d %d %d %d",
-		now.Year(), now.Month(), now.Day(), now.Weekday(),
+	expr := fmt.Sprintf("%d %d %d %d %d %d",
+		now.Month(), now.Day(), now.Weekday(),
 		now.Hour(), now.Minute(), now.Second())
 
 	fn := func(ctx context.Context, userdata any) {

@@ -20,6 +20,8 @@ Based on: https://github.com/robfig/cron (v3)
 
 - Allowed symbols: `,`, `-`, `/`, `*`.  
   - Not supported `? `  
+
+- Monday to Sunday are represented by the numbers 1 to 7 (ISO 8601).  
   
 - Months in expressions are numeric only, not in the form `Jan`, `Feb`, etc. Weeks are numeric only, not in the form `Mon`, `Tue`, etc.  
 

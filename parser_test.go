@@ -23,17 +23,17 @@ func TestActivation(t *testing.T) {
 		{"2012-07-09T15:00:50+08:00", "* * * * * 5/15", true},
 
 		// Test interaction of DOW and DOM.
-		// If both are restricted, then only one needs to match.
-		// {"2012-07-15T00:00:00+08:00", "* * 1,15 0 * * *", true},
-		// {"2012-06-15T00:00:00+08:00", "* * 1,15 0 * * *", true},
-		// {"2012-08-01T00:00:00+08:00", "* * 1,15 0 * * *", true},
-		// {"2012-07-15T00:00:00+08:00", "* * */10 0 * * *", true},
+		// If both are restricted, then both need to match.
+		{"2012-07-15T00:00:00+08:00", "* 1,15 7 * * *", true},
+		{"2012-06-15T00:00:00+08:00", "* 1,15 7 * * *", false},
+		{"2012-08-01T00:00:00+08:00", "* 1,15 7 * * *", false},
+		{"2012-07-15T00:00:00+08:00", "* */10 7 * * *", false},
 
 		// However, if one has a star, then both need to match.
-		{"2012-07-15T00:00:00+08:00", "* * 0 * * *", true},
+		{"2012-07-15T00:00:00+08:00", "* * 7 * * *", true},
 		{"2012-07-09T00:00:00+08:00", "* 1,15 * * * *", false},
 		{"2012-07-15T00:00:00+08:00", "* 1,15 * * * *", true},
-		{"2012-07-15T00:00:00+08:00", "* */2 0 * * *", true},
+		{"2012-07-15T00:00:00+08:00", "* */2 7 * * *", true},
 	}
 
 	for _, test := range tests {
@@ -42,9 +42,10 @@ func TestActivation(t *testing.T) {
 			t.Error(err)
 			continue
 		}
-		actual := sched.Next(parseTime(test.time).Add(-1 * time.Second))
-		// expected := getTime(test.time)
+
 		expected := parseTime(test.time)
+		actual := sched.Next(expected.Add(-1 * time.Second))
+
 		if test.expected && expected != actual || !test.expected && expected.Equal(actual) {
 			t.Errorf("Fail evaluating %s on %s: (expected) %s != %s (actual)",
 				test.spec, test.time, expected, actual)
@@ -135,25 +136,25 @@ func TestParserTimeZone(t *testing.T) {
 	}{
 		{
 			fmt.Sprintf("%d %d %d %d %d %d",
-				expect.Month(), expect.Day(), expect.Weekday(),
+				expect.Month(), expect.Day(), weekday(expect),
 				expect.Hour(), expect.Minute(), expect.Second()),
 			true,
 		},
 		{
 			fmt.Sprintf("TZ=Asia/Shanghai %d %d %d %d %d %d",
-				expect.In(shanghaiLoc).Month(), expect.In(shanghaiLoc).Day(), expect.In(shanghaiLoc).Weekday(),
+				expect.In(shanghaiLoc).Month(), expect.In(shanghaiLoc).Day(), weekday(expect.In(shanghaiLoc)),
 				expect.In(shanghaiLoc).Hour(), expect.In(shanghaiLoc).Minute(), expect.In(shanghaiLoc).Second()),
 			true,
 		},
 		{
 			fmt.Sprintf("TZ=Asia/Shanghai %d %d %d %d %d %d",
-				expect.Month(), expect.Day(), expect.Weekday(),
+				expect.Month(), expect.Day(), weekday(expect),
 				expect.Hour(), expect.Minute(), expect.Second()),
 			false,
 		},
 		{
 			fmt.Sprintf("TZ=Asia/Tokyo %d %d %d %d %d %d",
-				expect.In(shanghaiLoc).Month(), expect.In(shanghaiLoc).Day(), expect.In(shanghaiLoc).Weekday(),
+				expect.In(shanghaiLoc).Month(), expect.In(shanghaiLoc).Day(), weekday(expect.In(shanghaiLoc)),
 				expect.In(shanghaiLoc).Hour(), expect.In(shanghaiLoc).Minute(), expect.In(shanghaiLoc).Second()),
 			false,
 		},

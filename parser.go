@@ -28,7 +28,7 @@ type Parser struct {
 type SchedTime struct {
 	Month  uint64 // 月
 	Dom    uint64 // 日
-	Dow    uint64 // 星期，0=星期日
+	Dow    uint64 // 星期，7=星期日
 	Hour   uint64 // 时
 	Minute uint64 // 分
 	Second uint64 // 秒
@@ -62,8 +62,8 @@ func (f LayoutField) Bounds() (min, max int) {
 		max = 31
 
 	case Dow:
-		min = 0
-		max = 6
+		min = 1
+		max = 7
 
 	case Hour:
 		min = 0
@@ -316,7 +316,16 @@ LOOP:
 // 判断“日”是否匹配，匹配规则为：必须“日”和“星期”都匹配，则认为匹配
 func isDayMatch(st *SchedTime, t time.Time) bool {
 	domMatch := ((1 << t.Day()) & st.Dom) != 0
-	dowMatch := ((1 << t.Weekday()) & st.Dow) != 0
+	dowMatch := ((1 << weekday(t)) & st.Dow) != 0
 
 	return domMatch && dowMatch
+}
+
+// 获取 ISO 8601 的星期表示，即星期一到星期天使用1-7表示
+func weekday(t time.Time) int {
+	wday := int(t.Weekday())
+	if wday == 0 {
+		wday = 7
+	}
+	return wday
 }

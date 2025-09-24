@@ -112,7 +112,7 @@ func (b *Beat) run() {
 	for _, job := range b.jobs {
 		job.Next = job.Schedule.Next(now)
 
-		b.log.Debug(
+		b.log.Info(
 			"job.action", "schedule(init)",
 			"job.id", job.Id,
 			"job.next", job.Next.Format(time.RFC3339))

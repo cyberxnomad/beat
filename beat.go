@@ -145,9 +145,6 @@ func (b *Beat) run() {
 					if job.Next.After(now) || job.Next.IsZero() {
 						break
 					}
-					b.log.Debug(
-						"job.action", "execute",
-						"job.id", job.Id)
 
 					b.executeJob(job)
 
@@ -162,37 +159,23 @@ func (b *Beat) run() {
 				switch arg := op.(type) {
 				case opAdd:
 					newJob := (*job)(arg)
-
+					// 大循环中不会重新计算初始的下一次时间，所以必须在添加前计算一次
 					newJob.Next = newJob.Schedule.Next(now)
-					b.addJob(newJob)
 
-					b.log.Info(
-						"job.action", "add",
-						"job.id", newJob.Id,
-						"job.next", newJob.Next.Format(time.RFC3339))
+					b.addJob(newJob)
 
 				case opRemove:
 					id := string(arg)
 
 					b.removeJob(id)
 
-					b.log.Info(
-						"job.action", "remove",
-						"job.id", id)
-
 				case opRemoveAll:
 					b.removeAllJob()
-
-					b.log.Info("job.action", "remove-all")
 
 				case opRemoveByPattern:
 					pattern := (*regexp.Regexp)(arg)
 
 					b.removeJobByPattern(pattern)
-
-					b.log.Info(
-						"job.action", "remove-by-pattern",
-						"job.pattern", pattern.String())
 
 				case opStop:
 					return
@@ -235,11 +218,19 @@ func (b *Beat) executeJob(job *job) {
 			defer b.sem.Release(1)
 		}
 
+		b.log.Debug(
+			"job.action", "execute",
+			"job.id", job.Id)
+
 		job.Func(b.ctx, job.Userdata)
 	}()
 }
 
 func (b *Beat) addJob(job *job) {
+	b.log.Info(
+		"job.action", "add",
+		"job.id", job.Id)
+
 	found := b.find(job.Id)
 	if found != nil {
 		b.log.Warn("msg", "job already exists, overwrite the old one", "job.id", found.Id)
@@ -253,6 +244,10 @@ func (b *Beat) addJob(job *job) {
 //
 // 返回移除的任务对象，不存在则返回 nil
 func (b *Beat) removeJob(id string) {
+	b.log.Info(
+		"job.action", "remove",
+		"job.id", id)
+
 	jobs := make([]*job, 0)
 
 	for _, job := range b.jobs {
@@ -265,11 +260,17 @@ func (b *Beat) removeJob(id string) {
 
 // 移除全部任务
 func (b *Beat) removeAllJob() {
+	b.log.Info("job.action", "remove-all")
+
 	b.jobs = make([]*job, 0)
 }
 
 // 通过ID前缀移除任务，所有任务ID含有指定前缀的任务都将移除
 func (b *Beat) removeJobByPattern(pattern *regexp.Regexp) {
+	b.log.Info(
+		"job.action", "remove-by-pattern",
+		"job.pattern", pattern.String())
+
 	jobs := make([]*job, 0)
 
 	for _, job := range b.jobs {

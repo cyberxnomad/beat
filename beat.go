@@ -111,7 +111,11 @@ func (b *Beat) run() {
 	// 获取一次所有任务的下一次有效时间
 	for _, job := range b.jobs {
 		job.Next = job.Schedule.Next(now)
-		b.log.Info("job.action", "schedule", "job.id", job.Id, "job.next", job.Next.Format(time.RFC3339))
+
+		b.log.Debug(
+			"job.action", "schedule(init)",
+			"job.id", job.Id,
+			"job.next", job.Next.Format(time.RFC3339))
 	}
 
 	for {
@@ -141,7 +145,10 @@ func (b *Beat) run() {
 					if job.Next.After(now) || job.Next.IsZero() {
 						break
 					}
-					b.log.Debug("job.action", "execute", "job.id", job.Id)
+					b.log.Debug(
+						"job.action", "execute",
+						"job.id", job.Id)
+
 					b.executeJob(job)
 
 					job.Prev = job.Next
@@ -159,14 +166,19 @@ func (b *Beat) run() {
 					newJob.Next = newJob.Schedule.Next(now)
 					b.addJob(newJob)
 
-					b.log.Info("job.action", "add", "job.id", newJob.Id, "job.next", newJob.Next.Format(time.RFC3339))
+					b.log.Info(
+						"job.action", "add",
+						"job.id", newJob.Id,
+						"job.next", newJob.Next.Format(time.RFC3339))
 
 				case opRemove:
 					id := string(arg)
 
 					b.removeJob(id)
 
-					b.log.Info("job.action", "remove", "job.id", id)
+					b.log.Info(
+						"job.action", "remove",
+						"job.id", id)
 
 				case opRemoveAll:
 					b.removeAllJob()
@@ -178,7 +190,9 @@ func (b *Beat) run() {
 
 					b.removeJobByPattern(pattern)
 
-					b.log.Info("job.action", "remove-by-pattern", "job.pattern", pattern.String())
+					b.log.Info(
+						"job.action", "remove-by-pattern",
+						"job.pattern", pattern.String())
 
 				case opStop:
 					return

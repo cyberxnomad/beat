@@ -11,13 +11,11 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-type JobFunc func(ctx context.Context, userdata any)
+type JobFunc func(ctx context.Context)
 
 type job struct {
-	Id       string  // 任务ID
-	Func     JobFunc // 定时执行的任务
-	Userdata any     // 用户数据
-
+	Id       string    // 任务ID
+	Func     JobFunc   // 定时执行的任务
 	Schedule Schedule  // 定时时间
 	Next     time.Time // 下一次运行的时间
 	Prev     time.Time // 前一次运行的时间
@@ -78,7 +76,7 @@ type (
 	opStop            struct{}
 )
 
-func emptyJobFunc(_ context.Context, _ any) {}
+func emptyJobFunc(_ context.Context) {}
 
 func New(opts ...option) *Beat {
 	b := &Beat{
@@ -222,7 +220,7 @@ func (b *Beat) executeJob(job *job) {
 			"job.action", "execute",
 			"job.id", job.Id)
 
-		job.Func(b.ctx, job.Userdata)
+		job.Func(b.ctx)
 	}()
 }
 
@@ -303,7 +301,7 @@ func (b *Beat) find(id string) *job {
 //	id: 任务ID，每个任务ID唯一
 //	fn: 任务执行回调
 //	userdata: 用于保存用户数据，回调时将传递该数据
-func (b *Beat) Add(expr string, id string, fn JobFunc, userdata any) error {
+func (b *Beat) Add(expr string, id string, fn JobFunc) error {
 	sched, err := b.parser.Parse(expr)
 	if err != nil {
 		return err
@@ -316,7 +314,6 @@ func (b *Beat) Add(expr string, id string, fn JobFunc, userdata any) error {
 		Id:       id,
 		Schedule: sched,
 		Func:     fn,
-		Userdata: userdata,
 	}
 	if job.Func == nil {
 		job.Func = emptyJobFunc

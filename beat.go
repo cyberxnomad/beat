@@ -76,8 +76,6 @@ type (
 	opStop            struct{}
 )
 
-func emptyJobFunc(_ context.Context) {}
-
 func New(opts ...option) *Beat {
 	b := &Beat{
 		jobs:     []*job{},
@@ -316,7 +314,7 @@ func (b *Beat) Add(expr string, id string, fn JobFunc) error {
 		Func:     fn,
 	}
 	if job.Func == nil {
-		job.Func = emptyJobFunc
+		job.Func = func(_ context.Context) {}
 	}
 
 	if !b.running {

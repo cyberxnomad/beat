@@ -201,6 +201,12 @@ func (b *Beat) executeJob(job *job) {
 	b.jobWaiter.Add(1)
 
 	go func() {
+		defer b.jobWaiter.Done()
+
+		if b.sem != nil {
+			defer b.sem.Release(1)
+		}
+
 		if b.withRecovery {
 			defer func() {
 				if r := recover(); r != nil {
@@ -210,12 +216,6 @@ func (b *Beat) executeJob(job *job) {
 					b.log.Error("panic", r, "statck", string(buf))
 				}
 			}()
-		}
-
-		defer b.jobWaiter.Done()
-
-		if b.sem != nil {
-			defer b.sem.Release(1)
 		}
 
 		b.log.Debug(

@@ -27,7 +27,7 @@ type Beat struct {
 	withRecovery  bool                // 是否启用recover
 	lock          sync.Mutex          // 互斥锁
 	maxGoroutines int                 // 最大协程数量
-	sem           *semaphore.Weighted //
+	sem           *semaphore.Weighted // 协程数量限制信号量
 	running       bool                // 是否运行
 	parser        ScheduleParser      // 解析器
 	location      *time.Location      // 时区
@@ -237,8 +237,6 @@ func (b *Beat) addJob(job *job) {
 }
 
 // 移除任务
-//
-// 返回移除的任务对象，不存在则返回 nil
 func (b *Beat) removeJob(id string) {
 	b.log.Info(
 		"job.action", "remove",
@@ -261,7 +259,7 @@ func (b *Beat) removeAllJob() {
 	b.jobs = make([]*job, 0)
 }
 
-// 通过ID前缀移除任务，所有任务ID含有指定前缀的任务都将移除
+// 通过正则表达式移除任务，所有任务ID符合正则表达式的任务都将移除
 func (b *Beat) removeJobByPattern(pattern *regexp.Regexp) {
 	b.log.Info(
 		"job.action", "remove-by-pattern",
@@ -298,7 +296,6 @@ func (b *Beat) find(id string) *job {
 //	expr: 定时表达式
 //	id: 任务ID，每个任务ID唯一
 //	fn: 任务执行回调
-//	userdata: 用于保存用户数据，回调时将传递该数据
 func (b *Beat) Add(expr string, id string, fn JobFunc) error {
 	sched, err := b.parser.Parse(expr)
 	if err != nil {
